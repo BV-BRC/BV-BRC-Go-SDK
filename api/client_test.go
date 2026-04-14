@@ -223,3 +223,172 @@ func TestGetIDColumn(t *testing.T) {
 		})
 	}
 }
+
+func TestChunkInfo_CursorMark(t *testing.T) {
+	// Test that CursorMark field exists and works
+	info := &ChunkInfo{
+		Start:      0,
+		Next:       100,
+		Count:      500,
+		IsLast:     false,
+		CursorMark: "AoEoODMzMzIuMTI=",
+	}
+
+	if info.CursorMark != "AoEoODMzMzIuMTI=" {
+		t.Errorf("CursorMark = %q, want %q", info.CursorMark, "AoEoODMzMzIuMTI=")
+	}
+}
+
+func TestClient_QueryWithCursor(t *testing.T) {
+	// Create a test server that simulates cursor-based pagination
+	requestCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+
+		// Check request method
+		if r.Method != "POST" {
+			t.Errorf("Method = %q, want POST", r.Method)
+		}
+
+		// Check headers
+		if r.Header.Get("Accept") != "application/json" {
+			t.Errorf("Accept header = %q, want application/json", r.Header.Get("Accept"))
+		}
+
+		// Simulate cursor-based pagination
+		var data []map[string]any
+		var cursorMark string
+
+		switch requestCount {
+		case 1:
+			// First request
+			w.Header().Set("Content-Range", "items 0-2/5")
+			w.Header().Set("X-Cursor-Mark", "cursor1")
+			data = []map[string]any{
+				{"genome_id": "1.1", "genome_name": "Genome 1"},
+				{"genome_id": "1.2", "genome_name": "Genome 2"},
+			}
+		case 2:
+			// Second request
+			w.Header().Set("Content-Range", "items 0-2/5")
+			w.Header().Set("X-Cursor-Mark", "cursor2")
+			data = []map[string]any{
+				{"genome_id": "1.3", "genome_name": "Genome 3"},
+				{"genome_id": "1.4", "genome_name": "Genome 4"},
+			}
+		case 3:
+			// Third request - last page (cursor unchanged)
+			w.Header().Set("Content-Range", "items 0-1/5")
+			w.Header().Set("X-Cursor-Mark", "cursor2") // Same as sent, signals end
+			data = []map[string]any{
+				{"genome_id": "1.5", "genome_name": "Genome 5"},
+			}
+		default:
+			// Should not reach here
+			cursorMark = "unexpected"
+			data = []map[string]any{}
+		}
+
+		_ = cursorMark
+		json.NewEncoder(w).Encode(data)
+	}))
+	defer server.Close()
+
+	// Create client with test server
+	c := NewClient(WithBaseURL(server.URL), WithChunkSize(2))
+
+	// Execute cursor-based query
+	ctx := context.Background()
+	results, err := c.QueryWithCursor(ctx, "genome", NewQuery().Select("genome_id", "genome_name"))
+	if err != nil {
+		t.Fatalf("QueryWithCursor() error = %v", err)
+	}
+
+	if len(results) != 5 {
+		t.Errorf("len(results) = %d, want 5", len(results))
+	}
+
+	// Verify the server was called multiple times (pagination worked)
+	if requestCount < 2 {
+		t.Errorf("requestCount = %d, expected at least 2 requests for pagination", requestCount)
+	}
+}
+
+func TestClient_QueryWithCursor_SinglePage(t *testing.T) {
+	// Create a test server that returns all results in one page
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Range", "items 0-2/2")
+		w.Header().Set("X-Cursor-Mark", "*") // Same as initial, signals end
+		data := []map[string]any{
+			{"genome_id": "1.1", "genome_name": "Genome 1"},
+			{"genome_id": "1.2", "genome_name": "Genome 2"},
+		}
+		json.NewEncoder(w).Encode(data)
+	}))
+	defer server.Close()
+
+	c := NewClient(WithBaseURL(server.URL))
+
+	ctx := context.Background()
+	results, err := c.QueryWithCursor(ctx, "genome", NewQuery().Eq("genus", "Test"))
+	if err != nil {
+		t.Fatalf("QueryWithCursor() error = %v", err)
+	}
+
+	if len(results) != 2 {
+		t.Errorf("len(results) = %d, want 2", len(results))
+	}
+}
+
+func TestClient_QueryCallbackWithCursor(t *testing.T) {
+	requestCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+
+		var data []map[string]any
+		var nextCursor string
+
+		switch requestCount {
+		case 1:
+			w.Header().Set("Content-Range", "items 0-2/4")
+			nextCursor = "cursor1"
+			data = []map[string]any{
+				{"id": "1"}, {"id": "2"},
+			}
+		case 2:
+			w.Header().Set("Content-Range", "items 0-2/4")
+			nextCursor = "cursor1" // Same as sent, signals end
+			data = []map[string]any{
+				{"id": "3"}, {"id": "4"},
+			}
+		}
+
+		w.Header().Set("X-Cursor-Mark", nextCursor)
+		json.NewEncoder(w).Encode(data)
+	}))
+	defer server.Close()
+
+	c := NewClient(WithBaseURL(server.URL), WithChunkSize(2))
+
+	callbackCount := 0
+	totalRecords := 0
+
+	err := c.QueryCallbackWithCursor(context.Background(), "test", NewQuery().Eq("field", "value"),
+		func(records []map[string]any, info *ChunkInfo) bool {
+			callbackCount++
+			totalRecords += len(records)
+			return true
+		})
+
+	if err != nil {
+		t.Fatalf("QueryCallbackWithCursor() error = %v", err)
+	}
+
+	if callbackCount != 2 {
+		t.Errorf("callbackCount = %d, want 2", callbackCount)
+	}
+
+	if totalRecords != 4 {
+		t.Errorf("totalRecords = %d, want 4", totalRecords)
+	}
+}

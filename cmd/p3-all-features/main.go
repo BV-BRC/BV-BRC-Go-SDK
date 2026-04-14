@@ -24,6 +24,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/BV-BRC/BV-BRC-Go-SDK/api"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/auth"
@@ -79,6 +80,9 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 	if dataOpts.Debug {
 		clientOpts = append(clientOpts, api.WithDebug(true))
+	}
+	if dataOpts.APIURL != "" {
+		clientOpts = append(clientOpts, api.WithBaseURL(dataOpts.APIURL))
 	}
 	client := api.NewClient(clientOpts...)
 
@@ -138,17 +142,44 @@ func run(cmd *cobra.Command, args []string) error {
 	// Get delimiter for multi-valued fields
 	delim := ioOpts.GetDelimiter()
 
-	// Query and stream results
-	err = client.QueryCallback(ctx, "feature", query, func(records []map[string]any, info *api.ChunkInfo) bool {
-		for _, record := range records {
-			row := cli.FormatRecord(record, fields, delim)
-			if err := writer.WriteRow(row...); err != nil {
-				fmt.Fprintf(os.Stderr, "Error writing row: %v\n", err)
-				return false
+	// Choose pagination method based on --cursor flag
+	var queryFunc func() error
+	if dataOpts.Cursor {
+		// Use cursor-based pagination (more efficient for large result sets)
+		queryFunc = func() error {
+			err := client.QueryCallbackWithCursor(ctx, "feature", query, func(records []map[string]any, info *api.ChunkInfo) bool {
+				for _, record := range records {
+					row := cli.FormatRecord(record, fields, delim)
+					if err := writer.WriteRow(row...); err != nil {
+						fmt.Fprintf(os.Stderr, "Error writing row: %v\n", err)
+						return false
+					}
+				}
+				return true
+			})
+			if err != nil && strings.Contains(err.Error(), "undefined field object") {
+				return fmt.Errorf("%w\n\nNote: cursor-based pagination may not be supported by this API endpoint.\nTry using --api-url https://alpha.bv-brc.org/api or remove the --cursor flag", err)
 			}
+			return err
 		}
-		return true // continue fetching
-	})
+	} else {
+		// Use offset-based pagination (default)
+		queryFunc = func() error {
+			return client.QueryCallback(ctx, "feature", query, func(records []map[string]any, info *api.ChunkInfo) bool {
+				for _, record := range records {
+					row := cli.FormatRecord(record, fields, delim)
+					if err := writer.WriteRow(row...); err != nil {
+						fmt.Fprintf(os.Stderr, "Error writing row: %v\n", err)
+						return false
+					}
+				}
+				return true
+			})
+		}
+	}
+
+	// Execute query
+	err = queryFunc()
 
 	if err != nil {
 		return fmt.Errorf("querying features: %w", err)

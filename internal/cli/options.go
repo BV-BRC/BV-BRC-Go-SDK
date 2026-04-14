@@ -52,6 +52,12 @@ type DataOptions struct {
 
 	// Debug enables debug output
 	Debug bool
+
+	// Cursor enables cursor-based pagination (more efficient for large result sets)
+	Cursor bool
+
+	// APIURL overrides the default API URL
+	APIURL string
 }
 
 // AddDataFlags adds the standard data query flags to a cobra command.
@@ -87,6 +93,10 @@ func AddDataFlags(cmd *cobra.Command, opts *DataOptions) {
 		"maximum number of records to return")
 	flags.BoolVar(&opts.Debug, "debug", false,
 		"enable debug output")
+	flags.BoolVar(&opts.Cursor, "cursor", false,
+		"use cursor-based pagination (more efficient for large result sets)")
+	flags.StringVar(&opts.APIURL, "api-url", "",
+		"override API URL (default: https://www.bv-brc.org/api)")
 
 	// Add the equal alias
 	flags.StringArrayVar(&opts.Equal, "equal", nil, "")
@@ -277,9 +287,20 @@ func (d *DataOptions) BuildQueryWithFields(selectFields []string) (*api.Query, e
 }
 
 // GetSelectFields returns the fields to select, using defaults if none specified.
+// Empty field names are filtered out.
 func (d *DataOptions) GetSelectFields(defaultFields []string) []string {
 	if len(d.Attr) > 0 {
-		return d.Attr
+		// Filter out empty field names
+		var validFields []string
+		for _, f := range d.Attr {
+			if f != "" {
+				validFields = append(validFields, f)
+			}
+		}
+		if len(validFields) > 0 {
+			return validFields
+		}
+		return defaultFields
 	}
 	return defaultFields
 }

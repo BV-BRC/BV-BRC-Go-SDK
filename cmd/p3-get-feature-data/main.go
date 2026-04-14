@@ -80,6 +80,9 @@ func run(cmd *cobra.Command, args []string) error {
 	if dataOpts.Debug {
 		clientOpts = append(clientOpts, api.WithDebug(true))
 	}
+	if dataOpts.APIURL != "" {
+		clientOpts = append(clientOpts, api.WithBaseURL(dataOpts.APIURL))
+	}
 	client := api.NewClient(clientOpts...)
 
 	// Handle --fields option
