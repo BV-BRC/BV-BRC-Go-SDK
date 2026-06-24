@@ -9,12 +9,14 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/BV-BRC/BV-BRC-Go-SDK/api"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/appservice"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/auth"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/workspace"
@@ -76,6 +78,7 @@ func init() {
 }
 
 func run(cmd *cobra.Command, args []string) error {
+	ctx := context.Background()
 	outputPath := args[0]
 	outputName := args[1]
 
@@ -99,12 +102,19 @@ func run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("you must be logged in to BV-BRC via the p3-login command to submit jobs")
 	}
 
+	apiClient := api.NewClient(api.WithToken(token))
 	ws := workspace.New(workspace.WithToken(token))
 	app := appservice.New(appservice.WithToken(token))
 
 	outputPath = strings.TrimPrefix(outputPath, "ws:")
 	outputPath = expandWorkspacePath(outputPath)
 	outputPath = strings.TrimSuffix(outputPath, "/")
+
+	if !dryRun {
+		if err := ws.RequireFolder(outputPath); err != nil {
+			return err
+		}
+	}
 
 	if workspaceUploadDir == "" {
 		workspaceUploadDir = outputPath
@@ -133,6 +143,27 @@ func run(cmd *cobra.Command, args []string) error {
 		// Add reference to front
 		genomeList = append([]string{referenceGenomeID}, genomeList...)
 		referenceGenomeIndex = 1
+	}
+
+	// Validate genome IDs
+	var allGenomeIDs []string
+	if referenceGenomeID != "" {
+		allGenomeIDs = append(allGenomeIDs, referenceGenomeID)
+	}
+	allGenomeIDs = append(allGenomeIDs, genomeList...)
+	// Deduplicate
+	seen := make(map[string]bool)
+	var uniqueGenomeIDs []string
+	for _, id := range allGenomeIDs {
+		if !seen[id] {
+			seen[id] = true
+			uniqueGenomeIDs = append(uniqueGenomeIDs, id)
+		}
+	}
+	if !dryRun && len(uniqueGenomeIDs) > 0 {
+		if err := apiClient.RequireGenomeIDs(ctx, uniqueGenomeIDs); err != nil {
+			return err
+		}
 	}
 
 	// Process protein FASTA files

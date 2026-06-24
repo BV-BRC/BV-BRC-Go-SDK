@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -20,6 +21,11 @@ const (
 	DefaultChunkSize = 25000
 	// DefaultMaxRetries is the default number of retry attempts for failed requests.
 	DefaultMaxRetries = 3
+	// DefaultUserAgent is sent on every request. The data API sits behind
+	// Cloudflare, which bans default library user-agents (error 1010); this
+	// value is allowlisted at the edge. Override via WithUserAgent or the
+	// P3_USER_AGENT environment variable.
+	DefaultUserAgent = "BV-BRC P3 Client"
 )
 
 // Client provides access to the BV-BRC Data API.
@@ -30,14 +36,17 @@ type Client struct {
 	ChunkSize  int
 	MaxRetries int
 	Debug      bool
+	Verbose    bool   // Print retry messages to stderr
+	UserAgent  string // Sent as the User-Agent header (Cloudflare allowlist)
 }
 
 // ChunkInfo contains information about a response chunk from Content-Range header.
 type ChunkInfo struct {
-	Start  int
-	Next   int
-	Count  int
-	IsLast bool
+	Start      int
+	Next       int
+	Count      int
+	IsLast     bool
+	CursorMark string // Cursor mark from X-Cursor-Mark header for cursor-based pagination
 }
 
 // ClientOption is a function that configures a Client.
@@ -95,13 +104,34 @@ func WithDebug(debug bool) ClientOption {
 	}
 }
 
+// WithVerbose enables verbose output (retry messages to stderr).
+func WithVerbose(verbose bool) ClientOption {
+	return func(c *Client) {
+		c.Verbose = verbose
+	}
+}
+
+// WithUserAgent sets the User-Agent header sent on every request.
+func WithUserAgent(ua string) ClientOption {
+	return func(c *Client) {
+		if ua != "" {
+			c.UserAgent = ua
+		}
+	}
+}
+
 // NewClient creates a new BV-BRC API client with the given options.
 func NewClient(opts ...ClientOption) *Client {
+	ua := os.Getenv("P3_USER_AGENT")
+	if ua == "" {
+		ua = DefaultUserAgent
+	}
 	c := &Client{
 		BaseURL:    DefaultBaseURL,
 		HTTPClient: &http.Client{Timeout: 30 * time.Second},
 		ChunkSize:  DefaultChunkSize,
 		MaxRetries: DefaultMaxRetries,
+		UserAgent:  ua,
 	}
 	for _, opt := range opts {
 		opt(c)
@@ -201,6 +231,9 @@ func (c *Client) doQueryRequest(ctx context.Context, url, body string) ([]map[st
 		if attempt > 0 {
 			// Exponential backoff
 			delay := time.Duration(1<<uint(attempt-1)) * time.Second
+			if c.Verbose {
+				fmt.Fprintf(os.Stderr, "Retry %d/%d after %v: %v\n", attempt, c.MaxRetries, delay, lastErr)
+			}
 			select {
 			case <-ctx.Done():
 				return nil, nil, ctx.Err()
@@ -239,6 +272,9 @@ func (c *Client) doQueryRequest(ctx context.Context, url, body string) ([]map[st
 
 		// Parse Content-Range header
 		chunkInfo := parseContentRange(resp.Header.Get("Content-Range"))
+
+		// Extract cursor mark for cursor-based pagination
+		chunkInfo.CursorMark = resp.Header.Get("X-Cursor-Mark")
 
 		// Parse response body
 		var results []map[string]any
@@ -433,7 +469,11 @@ func (c *Client) setHeaders(req *http.Request) {
 	if c.Token != "" {
 		req.Header.Set("Authorization", c.Token)
 	}
-	req.Header.Set("User-Agent", "BV-BRC-Go-Client/1.0")
+	ua := c.UserAgent
+	if ua == "" {
+		ua = DefaultUserAgent
+	}
+	req.Header.Set("User-Agent", ua)
 }
 
 // urlEncode encodes a string for use in URLs, using PATRIC-specific encoding.
@@ -624,5 +664,247 @@ func (c *Client) QueryCallback(ctx context.Context, objectType string, q *Query,
 		}
 
 		offset = chunkInfo.Next
+	}
+}
+
+// QueryWithCursor executes a query using cursor-based pagination.
+// This is more efficient than offset-based pagination for large result sets,
+// as it avoids the performance degradation that occurs with high offsets.
+// The API must support cursor-based pagination (available on alpha.bv-brc.org).
+func (c *Client) QueryWithCursor(ctx context.Context, objectType string, q *Query) ([]map[string]any, error) {
+	var allResults []map[string]any
+
+	resolvedType := GetObjectType(objectType)
+
+	// Ensure query has at least one filter (BV-BRC API requirement)
+	if !q.HasFilters() {
+		idCol := GetIDColumn(resolvedType)
+		if idCol == "" {
+			idCol = "id"
+		}
+		q = q.Clone()
+		q.Eq(idCol, "*")
+	}
+
+	// Clone query for cursor manipulation
+	cursorQuery := q.Clone()
+
+	// Determine chunk size
+	chunkSize := c.ChunkSize
+	if q.LimitValue > 0 && q.LimitValue < chunkSize {
+		chunkSize = q.LimitValue
+	}
+
+	// Start with initial cursor
+	cursorMark := "*"
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+
+		// Build query with current cursor
+		cursorQuery.CursorMark = cursorMark
+		cursorQuery.LimitValue = chunkSize
+
+		reqURL := fmt.Sprintf("%s/%s/", c.BaseURL, resolvedType)
+		body := cursorQuery.Build()
+
+		if c.Debug {
+			fmt.Printf("DEBUG: POST %s (cursor)\n", reqURL)
+			fmt.Printf("DEBUG: Body: %s\n", body)
+		}
+
+		// Execute request
+		results, chunkInfo, err := c.doQueryRequest(ctx, reqURL, body)
+		if err != nil {
+			return nil, err
+		}
+
+		allResults = append(allResults, results...)
+
+		// End conditions:
+		// 1. No cursor returned
+		// 2. Cursor unchanged (end of results)
+		// 3. No results returned
+		if chunkInfo.CursorMark == "" ||
+			chunkInfo.CursorMark == cursorMark ||
+			len(results) == 0 {
+			break
+		}
+
+		// Check if we've reached the requested limit
+		if q.LimitValue > 0 && len(allResults) >= q.LimitValue {
+			break
+		}
+
+		cursorMark = chunkInfo.CursorMark
+	}
+
+	// Trim to requested limit if specified
+	if q.LimitValue > 0 && len(allResults) > q.LimitValue {
+		allResults = allResults[:q.LimitValue]
+	}
+
+	return allResults, nil
+}
+
+// StreamWithCursor returns results via channels using cursor-based pagination.
+// This is more efficient than offset-based pagination for large result sets.
+func (c *Client) StreamWithCursor(ctx context.Context, objectType string, q *Query) (<-chan map[string]any, <-chan error) {
+	results := make(chan map[string]any, 100)
+	errs := make(chan error, 1)
+
+	go func() {
+		defer close(results)
+		defer close(errs)
+
+		resolvedType := GetObjectType(objectType)
+
+		// Ensure query has at least one filter (BV-BRC API requirement)
+		if !q.HasFilters() {
+			idCol := GetIDColumn(resolvedType)
+			if idCol == "" {
+				idCol = "id"
+			}
+			q = q.Clone()
+			q.Eq(idCol, "*")
+		}
+
+		// Clone query for cursor manipulation
+		cursorQuery := q.Clone()
+
+		chunkSize := c.ChunkSize
+		if q.LimitValue > 0 && q.LimitValue < chunkSize {
+			chunkSize = q.LimitValue
+		}
+
+		cursorMark := "*"
+		totalSent := 0
+
+		for {
+			select {
+			case <-ctx.Done():
+				errs <- ctx.Err()
+				return
+			default:
+			}
+
+			cursorQuery.CursorMark = cursorMark
+			cursorQuery.LimitValue = chunkSize
+
+			reqURL := fmt.Sprintf("%s/%s/", c.BaseURL, resolvedType)
+			body := cursorQuery.Build()
+
+			batch, chunkInfo, err := c.doQueryRequest(ctx, reqURL, body)
+			if err != nil {
+				errs <- err
+				return
+			}
+
+			for _, record := range batch {
+				if q.LimitValue > 0 && totalSent >= q.LimitValue {
+					return
+				}
+				select {
+				case results <- record:
+					totalSent++
+				case <-ctx.Done():
+					errs <- ctx.Err()
+					return
+				}
+			}
+
+			// End conditions
+			if chunkInfo.CursorMark == "" ||
+				chunkInfo.CursorMark == cursorMark ||
+				len(batch) == 0 {
+				return
+			}
+
+			cursorMark = chunkInfo.CursorMark
+		}
+	}()
+
+	return results, errs
+}
+
+// QueryCallbackWithCursor executes a query using cursor-based pagination and calls
+// the callback function with each batch of results.
+// The callback receives the records and chunk information. Return false to stop fetching.
+func (c *Client) QueryCallbackWithCursor(ctx context.Context, objectType string, q *Query, callback func([]map[string]any, *ChunkInfo) bool) error {
+	resolvedType := GetObjectType(objectType)
+
+	// Ensure query has at least one filter (BV-BRC API requirement)
+	if !q.HasFilters() {
+		idCol := GetIDColumn(resolvedType)
+		if idCol == "" {
+			idCol = "id"
+		}
+		q = q.Clone()
+		q.Eq(idCol, "*")
+	}
+
+	// Clone query for cursor manipulation
+	cursorQuery := q.Clone()
+
+	chunkSize := c.ChunkSize
+	if q.LimitValue > 0 && q.LimitValue < chunkSize {
+		chunkSize = q.LimitValue
+	}
+
+	cursorMark := "*"
+	totalFetched := 0
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		cursorQuery.CursorMark = cursorMark
+		cursorQuery.LimitValue = chunkSize
+
+		reqURL := fmt.Sprintf("%s/%s/", c.BaseURL, resolvedType)
+		body := cursorQuery.Build()
+
+		if c.Debug {
+			fmt.Printf("DEBUG: POST %s (cursor)\n", reqURL)
+			fmt.Printf("DEBUG: Body: %s\n", body)
+		}
+
+		results, chunkInfo, err := c.doQueryRequest(ctx, reqURL, body)
+		if err != nil {
+			return err
+		}
+
+		// Trim results if we would exceed the limit
+		if q.LimitValue > 0 && totalFetched+len(results) > q.LimitValue {
+			results = results[:q.LimitValue-totalFetched]
+		}
+
+		totalFetched += len(results)
+
+		// Call the callback
+		if !callback(results, chunkInfo) {
+			return nil
+		}
+
+		// End conditions
+		if chunkInfo.CursorMark == "" ||
+			chunkInfo.CursorMark == cursorMark ||
+			len(results) == 0 {
+			return nil
+		}
+
+		// Check if we've reached the requested limit
+		if q.LimitValue > 0 && totalFetched >= q.LimitValue {
+			return nil
+		}
+
+		cursorMark = chunkInfo.CursorMark
 	}
 }

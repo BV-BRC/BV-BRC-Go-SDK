@@ -8,12 +8,15 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/BV-BRC/BV-BRC-Go-SDK/api"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cli"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/appservice"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/auth"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/workspace"
@@ -80,6 +83,7 @@ func init() {
 }
 
 func run(cmd *cobra.Command, args []string) error {
+	ctx := context.Background()
 	outputPath := args[0]
 	outputName := args[1]
 
@@ -119,11 +123,24 @@ func run(cmd *cobra.Command, args []string) error {
 	// Create clients
 	ws := workspace.New(workspace.WithToken(token))
 	app := appservice.New(appservice.WithToken(token))
+	apiClient := api.NewClient(api.WithToken(token))
 
 	// Clean output path
 	outputPath = strings.TrimPrefix(outputPath, "ws:")
 	outputPath = expandWorkspacePath(outputPath)
 	outputPath = strings.TrimSuffix(outputPath, "/")
+
+	if !dryRun {
+		if err := ws.RequireFolder(outputPath); err != nil {
+			return err
+		}
+	}
+
+	if !dryRun && referenceGenomeID != "" {
+		if err := apiClient.RequireGenomeIDs(ctx, []string{referenceGenomeID}); err != nil {
+			return err
+		}
+	}
 
 	// Set upload path default
 	if workspaceUploadDir == "" {
@@ -178,9 +195,15 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 	params["single_end_libs"] = singleLibs
 
-	// Add SRR IDs
+	// Add SRR libraries. FastqUtils expects SRA accessions under the
+	// "srr_libs" key as objects ({"srr_accession": id}), matching the Perl
+	// ReadSpec srrAlt mode with srr_label = "srr_libs".
 	if len(srrIDs) > 0 {
-		params["srr_ids"] = srrIDs
+		srrLibs := make([]map[string]interface{}, 0, len(srrIDs))
+		for _, id := range srrIDs {
+			srrLibs = append(srrLibs, map[string]interface{}{"srr_accession": id})
+		}
+		params["srr_libs"] = srrLibs
 	}
 
 	startParams := appservice.StartParams{}
@@ -269,6 +292,7 @@ func processFilename(ws *workspace.Client, path, fileType string, token *auth.To
 }
 
 func main() {
+	os.Args = cli.NormalizePairedEndLibArgs(os.Args)
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}

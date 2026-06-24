@@ -8,12 +8,15 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/BV-BRC/BV-BRC-Go-SDK/api"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cli"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/appservice"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/auth"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/workspace"
@@ -96,6 +99,7 @@ func init() {
 }
 
 func run(cmd *cobra.Command, args []string) error {
+	ctx := context.Background()
 	outputPath := args[0]
 	outputName := args[1]
 
@@ -127,11 +131,23 @@ func run(cmd *cobra.Command, args []string) error {
 	// Create clients
 	ws := workspace.New(workspace.WithToken(token))
 	app := appservice.New(appservice.WithToken(token))
+	apiClient := api.NewClient(api.WithToken(token))
 
 	// Clean output path
 	outputPath = strings.TrimPrefix(outputPath, "ws:")
 	outputPath = expandWorkspacePath(outputPath)
 	outputPath = strings.TrimSuffix(outputPath, "/")
+
+	if !dryRun {
+		if err := ws.RequireFolder(outputPath); err != nil {
+			return err
+		}
+		if referenceGenomeID != "" {
+			if err := apiClient.RequireGenomeIDs(ctx, []string{referenceGenomeID}); err != nil {
+				return err
+			}
+		}
+	}
 
 	// Set upload path default
 	if workspaceUploadDir == "" {
@@ -329,6 +345,7 @@ func processFilename(ws *workspace.Client, path, fileType string, token *auth.To
 }
 
 func main() {
+	os.Args = cli.NormalizePairedEndLibArgs(os.Args)
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}

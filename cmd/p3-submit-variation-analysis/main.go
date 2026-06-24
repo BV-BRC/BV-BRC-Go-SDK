@@ -8,12 +8,15 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/BV-BRC/BV-BRC-Go-SDK/api"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cli"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/appservice"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/auth"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/workspace"
@@ -36,10 +39,11 @@ var (
 
 var validMappers = map[string]bool{
 	"BWA-mem": true, "BWA-mem-strict": true, "Bowtie2": true, "LAST": true, "minimap2": true,
+	"Snippy": true,
 }
 
 var validCallers = map[string]bool{
-	"FreeBayes": true, "BCFtools": true,
+	"FreeBayes": true, "BCFtools": true, "Snippy": true,
 }
 
 var rootCmd = &cobra.Command{
@@ -73,13 +77,14 @@ func init() {
 	rootCmd.Flags().StringArrayVar(&singleEndLibs, "single-end-lib", nil, "single-end read library")
 	rootCmd.Flags().StringArrayVar(&srrIDs, "srr-id", nil, "SRA run ID")
 	rootCmd.Flags().StringVar(&referenceGenomeID, "reference-genome-id", "", "reference genome ID (required)")
-	rootCmd.Flags().StringVar(&mapper, "mapper", "BWA-mem", "mapping utility (BWA-mem, BWA-mem-strict, Bowtie2, LAST, minimap2)")
-	rootCmd.Flags().StringVar(&caller, "caller", "FreeBayes", "SNP calling utility (FreeBayes, BCFtools)")
+	rootCmd.Flags().StringVar(&mapper, "mapper", "BWA-mem", "mapping utility (BWA-mem, BWA-mem-strict, Bowtie2, LAST, minimap2, Snippy)")
+	rootCmd.Flags().StringVar(&caller, "caller", "FreeBayes", "SNP calling utility (FreeBayes, BCFtools, Snippy)")
 
 	rootCmd.MarkFlagRequired("reference-genome-id")
 }
 
 func run(cmd *cobra.Command, args []string) error {
+	ctx := context.Background()
 	outputPath := args[0]
 	outputName := args[1]
 
@@ -113,6 +118,19 @@ func run(cmd *cobra.Command, args []string) error {
 	outputPath = strings.TrimPrefix(outputPath, "ws:")
 	outputPath = expandWorkspacePath(outputPath)
 	outputPath = strings.TrimSuffix(outputPath, "/")
+
+	if !dryRun {
+		if err := ws.RequireFolder(outputPath); err != nil {
+			return err
+		}
+	}
+
+	if !dryRun && referenceGenomeID != "" {
+		apiClient := api.NewClient(api.WithToken(token))
+		if err := apiClient.RequireGenomeIDs(ctx, []string{referenceGenomeID}); err != nil {
+			return err
+		}
+	}
 
 	if workspaceUploadDir == "" {
 		workspaceUploadDir = outputPath
@@ -246,6 +264,7 @@ func processFilename(ws *workspace.Client, path, fileType string, token *auth.To
 }
 
 func main() {
+	os.Args = cli.NormalizePairedEndLibArgs(os.Args)
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}

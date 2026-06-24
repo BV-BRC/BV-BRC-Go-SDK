@@ -139,7 +139,7 @@ func TestQuery_Build(t *testing.T) {
 		{
 			name:  "required field",
 			query: NewQuery().Required("field"),
-			want:  "ne(field,)",
+			want:  "eq(field,*)",
 		},
 		{
 			name:  "keyword",
@@ -163,7 +163,7 @@ func TestQuery_Build(t *testing.T) {
 				Eq("genus", "Streptomyces").
 				Required("genome_name").
 				Sort("genome_name", false),
-			want: "select(genome_id,genome_name)&eq(genus,Streptomyces)&ne(genome_name,)&sort(+genome_name)",
+			want: "select(genome_id,genome_name)&eq(genus,Streptomyces)&eq(genome_name,*)&sort(+genome_name)",
 		},
 	}
 
@@ -266,5 +266,84 @@ func TestParseInFilterSpec(t *testing.T) {
 				t.Errorf("len(values) = %d, want %d", len(values), len(tt.wantValues))
 			}
 		})
+	}
+}
+
+func TestQuery_Cursor(t *testing.T) {
+	q := NewQuery().Cursor("*")
+
+	if q.CursorMark != "*" {
+		t.Errorf("CursorMark = %q, want %q", q.CursorMark, "*")
+	}
+
+	// Test with actual cursor value
+	q2 := NewQuery().Cursor("AoEoODMzMzIuMTI=")
+	if q2.CursorMark != "AoEoODMzMzIuMTI=" {
+		t.Errorf("CursorMark = %q, want %q", q2.CursorMark, "AoEoODMzMzIuMTI=")
+	}
+}
+
+func TestQuery_Build_WithCursor(t *testing.T) {
+	tests := []struct {
+		name  string
+		query *Query
+		want  string
+	}{
+		{
+			name:  "cursor only",
+			query: NewQuery().Cursor("*"),
+			want:  "cursor(*)",
+		},
+		{
+			name:  "cursor with base64 value",
+			query: NewQuery().Cursor("AoEoODMzMzIuMTI="),
+			want:  "cursor(AoEoODMzMzIuMTI=)",
+		},
+		{
+			name: "complete query with cursor",
+			query: NewQuery().
+				Select("genome_id", "genome_name").
+				Eq("genome_id", "83332.12").
+				Cursor("*").
+				Limit(100),
+			want: "select(genome_id,genome_name)&eq(genome_id,83332.12)&cursor(*)",
+		},
+		{
+			name: "cursor with sort",
+			query: NewQuery().
+				Eq("genus", "Mycobacterium").
+				Sort("genome_id", false).
+				Cursor("*"),
+			want: "eq(genus,Mycobacterium)&sort(+genome_id)&cursor(*)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.query.Build()
+			if got != tt.want {
+				t.Errorf("Build() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestQuery_Clone_WithCursor(t *testing.T) {
+	original := NewQuery().
+		Select("field1").
+		Eq("name", "value").
+		Cursor("AoEoODMzMzIuMTI=")
+
+	clone := original.Clone()
+
+	// Verify cursor is cloned
+	if clone.CursorMark != original.CursorMark {
+		t.Errorf("Clone CursorMark = %q, want %q", clone.CursorMark, original.CursorMark)
+	}
+
+	// Verify clone is independent
+	clone.CursorMark = "different"
+	if original.CursorMark == "different" {
+		t.Error("Modifying clone cursor affected original")
 	}
 }

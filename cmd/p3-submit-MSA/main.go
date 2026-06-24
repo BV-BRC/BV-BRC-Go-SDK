@@ -38,8 +38,9 @@ var alphabetTypeMap = map[string]string{
 }
 
 var validAligners = map[string]bool{
-	"Muscle": true,
-	"Mafft":  true,
+	"Muscle":           true,
+	"Mafft":            true,
+	"progressiveMauve": true,
 }
 
 var rootCmd = &cobra.Command{
@@ -67,7 +68,7 @@ func init() {
 	rootCmd.Flags().BoolVarP(&overwrite, "overwrite", "f", false, "overwrite existing files")
 	rootCmd.Flags().BoolVar(&dryRun, "dry-run", false, "validate but don't submit")
 
-	rootCmd.Flags().StringVar(&aligner, "aligner", "Muscle", "aligner to use (Muscle or Mafft)")
+	rootCmd.Flags().StringVar(&aligner, "aligner", "Muscle", "aligner to use (Muscle, Mafft, or progressiveMauve)")
 	rootCmd.Flags().StringVar(&alphabet, "alphabet", "dna", "sequence type (dna or protein)")
 	rootCmd.Flags().StringArrayVar(&fastaFiles, "fasta-file", nil, "FASTA file to align")
 	rootCmd.Flags().StringArrayVar(&featureGroups, "feature-group", nil, "feature group to align")
@@ -110,6 +111,12 @@ func run(cmd *cobra.Command, args []string) error {
 	outputPath = strings.TrimPrefix(outputPath, "ws:")
 	outputPath = expandWorkspacePath(outputPath)
 	outputPath = strings.TrimSuffix(outputPath, "/")
+
+	if !dryRun {
+		if err := ws.RequireFolder(outputPath); err != nil {
+			return err
+		}
+	}
 
 	// Set upload path default
 	if workspaceUploadDir == "" {

@@ -27,6 +27,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/BV-BRC/BV-BRC-Go-SDK/api"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/auth"
@@ -62,7 +63,8 @@ Examples:
 
   # Count human-associated genomes
   p3-all-genomes --eq host_name,Human --count`,
-	RunE: run,
+	RunE:         run,
+	SilenceUsage: true, // Don't print usage on runtime errors
 }
 
 func init() {
@@ -83,6 +85,18 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 	if dataOpts.Debug {
 		clientOpts = append(clientOpts, api.WithDebug(true))
+	}
+	if dataOpts.APIURL != "" {
+		clientOpts = append(clientOpts, api.WithBaseURL(dataOpts.APIURL))
+	}
+	if dataOpts.MaxRetries > 0 {
+		clientOpts = append(clientOpts, api.WithMaxRetries(dataOpts.MaxRetries))
+	}
+	if dataOpts.Verbose {
+		clientOpts = append(clientOpts, api.WithVerbose(true))
+	}
+	if dataOpts.UserAgent != "" {
+		clientOpts = append(clientOpts, api.WithUserAgent(dataOpts.UserAgent))
 	}
 	client := api.NewClient(clientOpts...)
 
@@ -142,17 +156,46 @@ func run(cmd *cobra.Command, args []string) error {
 	// Get delimiter for multi-valued fields
 	delim := ioOpts.GetDelimiter()
 
-	// Query and stream results
-	err = client.QueryCallback(ctx, "genome", query, func(records []map[string]any, info *api.ChunkInfo) bool {
-		for _, record := range records {
-			row := cli.FormatRecord(record, fields, delim)
-			if err := writer.WriteRow(row...); err != nil {
-				fmt.Fprintf(os.Stderr, "Error writing row: %v\n", err)
-				return false
+	// Choose pagination method based on --cursor flag
+	var queryFunc func() error
+	if dataOpts.Cursor {
+		// Use cursor-based pagination (more efficient for large result sets)
+		// Note: cursor support requires alpha.bv-brc.org or a compatible API
+		queryFunc = func() error {
+			err := client.QueryCallbackWithCursor(ctx, "genome", query, func(records []map[string]any, info *api.ChunkInfo) bool {
+				for _, record := range records {
+					row := cli.FormatRecord(record, fields, delim)
+					if err := writer.WriteRow(row...); err != nil {
+						fmt.Fprintf(os.Stderr, "Error writing row: %v\n", err)
+						return false
+					}
+				}
+				return true // continue fetching
+			})
+			// Check if the error is due to cursor not being supported
+			if err != nil && strings.Contains(err.Error(), "undefined field object") {
+				return fmt.Errorf("%w\n\nNote: cursor-based pagination may not be supported by this API endpoint.\nTry using --api-url https://alpha.bv-brc.org/api or remove the --cursor flag", err)
 			}
+			return err
 		}
-		return true // continue fetching
-	})
+	} else {
+		// Use offset-based pagination (default)
+		queryFunc = func() error {
+			return client.QueryCallback(ctx, "genome", query, func(records []map[string]any, info *api.ChunkInfo) bool {
+				for _, record := range records {
+					row := cli.FormatRecord(record, fields, delim)
+					if err := writer.WriteRow(row...); err != nil {
+						fmt.Fprintf(os.Stderr, "Error writing row: %v\n", err)
+						return false
+					}
+				}
+				return true // continue fetching
+			})
+		}
+	}
+
+	// Execute query
+	err = queryFunc()
 
 	if err != nil {
 		return fmt.Errorf("querying genomes: %w", err)

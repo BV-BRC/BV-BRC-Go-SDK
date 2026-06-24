@@ -52,6 +52,10 @@ type Query struct {
 
 	// LimitValue is the maximum number of records to return (0 = unlimited).
 	LimitValue int
+
+	// CursorMark is the cursor mark for cursor-based pagination.
+	// Use "*" to start pagination, or pass the cursor from a previous response.
+	CursorMark string
 }
 
 // NewQuery creates a new empty query.
@@ -131,13 +135,28 @@ func (q *Query) Limit(n int) *Query {
 	return q
 }
 
+// Cursor sets the cursor mark for cursor-based pagination.
+// Use "*" to start pagination, or pass the cursor from a previous response.
+func (q *Query) Cursor(mark string) *Query {
+	q.CursorMark = mark
+	return q
+}
+
 // Build generates the query string for the API.
 func (q *Query) Build() string {
 	var parts []string
 
-	// Add select clause
+	// Add select clause (filter out empty field names)
 	if len(q.SelectFields) > 0 {
-		parts = append(parts, fmt.Sprintf("select(%s)", strings.Join(q.SelectFields, ",")))
+		var validFields []string
+		for _, f := range q.SelectFields {
+			if f != "" {
+				validFields = append(validFields, f)
+			}
+		}
+		if len(validFields) > 0 {
+			parts = append(parts, fmt.Sprintf("select(%s)", strings.Join(validFields, ",")))
+		}
 	}
 
 	// Add filters
@@ -156,9 +175,11 @@ func (q *Query) Build() string {
 		parts = append(parts, part)
 	}
 
-	// Add required fields
+	// Add required fields (field must have a value)
 	for _, field := range q.RequiredFields {
-		parts = append(parts, fmt.Sprintf("ne(%s,)", field))
+		if field != "" {
+			parts = append(parts, fmt.Sprintf("eq(%s,*)", field))
+		}
 	}
 
 	// Add keyword search
@@ -177,6 +198,11 @@ func (q *Query) Build() string {
 			sortFields = append(sortFields, prefix+s.Field)
 		}
 		parts = append(parts, fmt.Sprintf("sort(%s)", strings.Join(sortFields, ",")))
+	}
+
+	// Add cursor
+	if q.CursorMark != "" {
+		parts = append(parts, fmt.Sprintf("cursor(%s)", q.CursorMark))
 	}
 
 	return strings.Join(parts, "&")
@@ -206,6 +232,7 @@ func (q *Query) Clone() *Query {
 		Keyword:        q.Keyword,
 		SortSpecs:      make([]SortSpec, len(q.SortSpecs)),
 		LimitValue:     q.LimitValue,
+		CursorMark:     q.CursorMark,
 	}
 	copy(newQ.SelectFields, q.SelectFields)
 	copy(newQ.Filters, q.Filters)

@@ -38,11 +38,11 @@ var virusTypes = map[string]string{
 	"HCV":          "Flaviviridae - Hepatitis C virus",
 	"INFLUENZAH5":  "Orthomyxoviridae - Influenza A H5",
 	"JAPANENCEPH":  "Flaviviridae - Japanese encephalitis virus",
-	"MASTADENO_A":  "Adenoviridae - Human mastadenovirus A",
-	"MASTADENO_B":  "Adenoviridae - Human mastadenovirus B",
-	"MASTADENO_C":  "Adenoviridae - Human mastadenovirus C",
-	"MASTADENO_E":  "Adenoviridae - Human mastadenovirus E",
-	"MASTADENO_F":  "Adenoviridae - Human mastadenovirus F",
+	"MASTADENOA":   "Adenoviridae - Human mastadenovirus A",
+	"MASTADENOB":   "Adenoviridae - Human mastadenovirus B",
+	"MASTADENOC":   "Adenoviridae - Human mastadenovirus C",
+	"MASTADENOE":   "Adenoviridae - Human mastadenovirus E",
+	"MASTADENOF":   "Adenoviridae - Human mastadenovirus F",
 	"MEASLES":      "Paramyxoviridae - Measles morbilivirus",
 	"MPOX":         "Poxviridae - Monkeypox virus",
 	"MUMPS":        "Paramyxoviridae - Mumps orthorubulavirus",
@@ -140,6 +140,12 @@ func run(cmd *cobra.Command, args []string) error {
 	outputPath = strings.TrimPrefix(outputPath, "ws:")
 	outputPath = expandWorkspacePath(outputPath)
 	outputPath = strings.TrimSuffix(outputPath, "/")
+
+	if !dryRun {
+		if err := ws.RequireFolder(outputPath); err != nil {
+			return err
+		}
+	}
 
 	if workspaceUploadDir == "" {
 		workspaceUploadDir = outputPath

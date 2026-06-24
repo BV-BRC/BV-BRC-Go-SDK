@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cli"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/appservice"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/auth"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/workspace"
@@ -120,10 +121,10 @@ func run(cmd *cobra.Command, args []string) error {
 	outputPath = expandWorkspacePath(outputPath)
 	outputPath = strings.TrimSuffix(outputPath, "/")
 
-	// Verify output path exists and is a folder
-	meta, err := ws.Stat(outputPath, false)
-	if err != nil || !meta.IsFolder() {
-		return fmt.Errorf("output path %s does not exist or is not a directory", outputPath)
+	if !dryRun {
+		if err := ws.RequireFolder(outputPath); err != nil {
+			return err
+		}
 	}
 
 	// Set upload path default
@@ -318,6 +319,7 @@ func formatSize(size int64) string {
 }
 
 func main() {
+	os.Args = cli.NormalizePairedEndLibArgs(os.Args)
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}

@@ -9,13 +9,16 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
 
+	"github.com/BV-BRC/BV-BRC-Go-SDK/api"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/appservice"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/auth"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/workspace"
 	"github.com/spf13/cobra"
 )
 
@@ -63,6 +66,7 @@ func init() {
 }
 
 func run(cmd *cobra.Command, args []string) error {
+	ctx := context.Background()
 	outputPath := args[0]
 	outputName := args[1]
 
@@ -95,6 +99,14 @@ func run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("you must be logged in to BV-BRC via the p3-login command to submit jobs")
 	}
 
+	// Validate genome IDs
+	apiClient := api.NewClient(api.WithToken(token))
+	if !dryRun && len(genomeList) > 0 {
+		if err := apiClient.RequireGenomeIDs(ctx, genomeList); err != nil {
+			return err
+		}
+	}
+
 	// Create client
 	app := appservice.New(appservice.WithToken(token))
 
@@ -102,6 +114,13 @@ func run(cmd *cobra.Command, args []string) error {
 	outputPath = strings.TrimPrefix(outputPath, "ws:")
 	outputPath = expandWorkspacePath(outputPath)
 	outputPath = strings.TrimSuffix(outputPath, "/")
+
+	if !dryRun {
+		ws := workspace.New(workspace.WithToken(token))
+		if err := ws.RequireFolder(outputPath); err != nil {
+			return err
+		}
+	}
 
 	// Build parameters
 	params := map[string]interface{}{

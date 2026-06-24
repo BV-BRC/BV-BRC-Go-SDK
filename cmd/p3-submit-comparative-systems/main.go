@@ -16,6 +16,7 @@ import (
 
 	"github.com/BV-BRC/BV-BRC-Go-SDK/appservice"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/auth"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/workspace"
 	"github.com/spf13/cobra"
 )
 
@@ -76,6 +77,13 @@ func run(cmd *cobra.Command, args []string) error {
 	outputPath = strings.TrimPrefix(outputPath, "ws:")
 	outputPath = expandWorkspacePath(outputPath)
 	outputPath = strings.TrimSuffix(outputPath, "/")
+
+	if !dryRun {
+		ws := workspace.New(workspace.WithToken(token))
+		if err := ws.RequireFolder(outputPath); err != nil {
+			return err
+		}
+	}
 
 	params := map[string]interface{}{
 		"output_path": outputPath,
