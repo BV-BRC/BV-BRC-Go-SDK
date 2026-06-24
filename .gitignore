@@ -17,6 +17,11 @@ cmd/p3-*/p3-*
 
 # Build output
 dist/
+/bin/
+
+# Python (test/submit-suite)
+__pycache__/
+*.pyc
 
 # IDE
 .idea/

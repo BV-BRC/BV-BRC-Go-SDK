@@ -178,9 +178,15 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 	params["single_end_libs"] = singleLibs
 
-	// Add SRR IDs
+	// Add SRR libraries. FastqUtils expects SRA accessions under the
+	// "srr_libs" key as objects ({"srr_accession": id}), matching the Perl
+	// ReadSpec srrAlt mode with srr_label = "srr_libs".
 	if len(srrIDs) > 0 {
-		params["srr_ids"] = srrIDs
+		srrLibs := make([]map[string]interface{}, 0, len(srrIDs))
+		for _, id := range srrIDs {
+			srrLibs = append(srrLibs, map[string]interface{}{"srr_accession": id})
+		}
+		params["srr_libs"] = srrLibs
 	}
 
 	startParams := appservice.StartParams{}
