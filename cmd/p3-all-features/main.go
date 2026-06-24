@@ -59,7 +59,8 @@ Examples:
 
   # Count features for a genome
   p3-all-features --eq genome_id,83332.12 --count`,
-	RunE: run,
+	RunE:         run,
+	SilenceUsage: true, // Don't print usage on runtime errors
 }
 
 func init() {
@@ -83,6 +84,12 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 	if dataOpts.APIURL != "" {
 		clientOpts = append(clientOpts, api.WithBaseURL(dataOpts.APIURL))
+	}
+	if dataOpts.MaxRetries > 0 {
+		clientOpts = append(clientOpts, api.WithMaxRetries(dataOpts.MaxRetries))
+	}
+	if dataOpts.Verbose {
+		clientOpts = append(clientOpts, api.WithVerbose(true))
 	}
 	client := api.NewClient(clientOpts...)
 

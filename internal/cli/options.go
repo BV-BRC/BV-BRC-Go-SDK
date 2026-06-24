@@ -5,6 +5,8 @@
 package cli
 
 import (
+	"strings"
+
 	"github.com/BV-BRC/BV-BRC-Go-SDK/api"
 	"github.com/spf13/cobra"
 )
@@ -58,6 +60,15 @@ type DataOptions struct {
 
 	// APIURL overrides the default API URL
 	APIURL string
+
+	// MaxRetries is the maximum number of retry attempts for failed requests
+	MaxRetries int
+
+	// Verbose enables verbose output (retry messages to stderr)
+	Verbose bool
+
+	// Sort specifies field(s) to sort by (prefix with - for descending)
+	Sort []string
 }
 
 // AddDataFlags adds the standard data query flags to a cobra command.
@@ -97,6 +108,12 @@ func AddDataFlags(cmd *cobra.Command, opts *DataOptions) {
 		"use cursor-based pagination (more efficient for large result sets)")
 	flags.StringVar(&opts.APIURL, "api-url", "",
 		"override API URL (default: https://www.bv-brc.org/api)")
+	flags.IntVar(&opts.MaxRetries, "max-retries", 0,
+		"maximum retry attempts for failed requests (0 = use default)")
+	flags.BoolVarP(&opts.Verbose, "verbose", "v", false,
+		"print retry messages to stderr")
+	flags.StringSliceVar(&opts.Sort, "sort", nil,
+		"field(s) to sort by (prefix with - for descending, e.g. -genome_id)")
 
 	// Add the equal alias
 	flags.StringArrayVar(&opts.Equal, "equal", nil, "")
@@ -185,6 +202,15 @@ func (d *DataOptions) BuildQuery(defaultFields []string) (*api.Query, error) {
 	// Add keyword
 	if d.Keyword != "" {
 		q.WithKeyword(d.Keyword)
+	}
+
+	// Add sort
+	for _, s := range d.Sort {
+		if strings.HasPrefix(s, "-") {
+			q.Sort(s[1:], true) // descending
+		} else {
+			q.Sort(s, false) // ascending
+		}
 	}
 
 	// Add limit
@@ -276,6 +302,15 @@ func (d *DataOptions) BuildQueryWithFields(selectFields []string) (*api.Query, e
 	// Add keyword
 	if d.Keyword != "" {
 		q.WithKeyword(d.Keyword)
+	}
+
+	// Add sort
+	for _, s := range d.Sort {
+		if strings.HasPrefix(s, "-") {
+			q.Sort(s[1:], true) // descending
+		} else {
+			q.Sort(s, false) // ascending
+		}
 	}
 
 	// Add limit

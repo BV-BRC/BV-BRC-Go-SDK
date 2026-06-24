@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -30,6 +31,7 @@ type Client struct {
 	ChunkSize  int
 	MaxRetries int
 	Debug      bool
+	Verbose    bool // Print retry messages to stderr
 }
 
 // ChunkInfo contains information about a response chunk from Content-Range header.
@@ -93,6 +95,13 @@ func WithMaxRetries(retries int) ClientOption {
 func WithDebug(debug bool) ClientOption {
 	return func(c *Client) {
 		c.Debug = debug
+	}
+}
+
+// WithVerbose enables verbose output (retry messages to stderr).
+func WithVerbose(verbose bool) ClientOption {
+	return func(c *Client) {
+		c.Verbose = verbose
 	}
 }
 
@@ -202,6 +211,9 @@ func (c *Client) doQueryRequest(ctx context.Context, url, body string) ([]map[st
 		if attempt > 0 {
 			// Exponential backoff
 			delay := time.Duration(1<<uint(attempt-1)) * time.Second
+			if c.Verbose {
+				fmt.Fprintf(os.Stderr, "Retry %d/%d after %v: %v\n", attempt, c.MaxRetries, delay, lastErr)
+			}
 			select {
 			case <-ctx.Done():
 				return nil, nil, ctx.Err()
