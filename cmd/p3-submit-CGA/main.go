@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cli"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/appservice"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/auth"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/workspace"
@@ -382,6 +383,7 @@ func readGenomeFile(filename string) ([]string, error) {
 }
 
 func main() {
+	os.Args = cli.NormalizePairedEndLibArgs(os.Args)
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
