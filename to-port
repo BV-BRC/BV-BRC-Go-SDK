@@ -1,8 +1,7 @@
-# Deferred — require GenomeTypeObject (no Go equivalent) or per-sequence BLAST:
+# Deferred — require GenomeTypeObject (no Go equivalent):
 2021-09-01	p3-gto
 2021-09-01	p3-gto-dna
 2021-09-01	p3-gto-fasta
 2021-09-01	p3-gto-fetch
 2021-09-01	p3-gto-scan
 2025-07-16	p3-feature-upstream
-2021-09-01	p3-get-features-by-sequence

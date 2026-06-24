@@ -120,6 +120,7 @@ reflects. Status ✅ = verified current as of the date shown.
 | p3-get-feature-group | p3-get-feature-group.pl | `93ea60c` | 2025-08-05 | ✅ ported 2026-06 |
 | p3-put-genome-group | p3-put-genome-group.pl | `93ea60c` | 2025-08-05 | ✅ ported 2026-06 |
 | p3-put-feature-group | p3-put-feature-group.pl | `93ea60c` | 2025-08-05 | ✅ ported 2026-06 |
+| p3-get-features-by-sequence | p3-get-features-by-sequence.pl | `9fbdbfe` | 2021-09-01 | ✅ ported 2026-06 — uses na/aa_sequence_md5 directly (Perl used protein translation workaround) |
 | p3-list-genome-groups | p3-list-genome-groups.pl | `4049829` | 2019-10-25 | ✅ ported 2026-06 |
 | p3-list-feature-groups | p3-list-feature-groups.pl | `4049829` | 2019-10-25 | ✅ ported 2026-06 |
 | p3-genus-species | p3-genus-species.pl | `0ddd93c` | 2025-06-04 | ✅ ported 2026-06 |
