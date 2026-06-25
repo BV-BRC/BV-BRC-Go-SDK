@@ -1,0 +1,196 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write   # needed to upload release assets
+
+jobs:
+  # -----------------------------------------------------------------------
+  # Job 1: Linux tarballs + .deb  (cross-compiled on ubuntu)
+  # -----------------------------------------------------------------------
+  build-linux:
+    name: Build Linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set VERSION from tag
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
+
+      - name: Build Linux amd64 + arm64
+        run: VERSION=${{ env.VERSION }} bash build-linux.sh
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-dist
+          path: |
+            dist/bvbrc-cli-*-linux-*.tar.gz
+            dist/bvbrc-cli_*_*.deb
+          retention-days: 1
+
+  # -----------------------------------------------------------------------
+  # Job 2: macOS tarballs + unsigned .pkg  (macos runner for lipo + pkgbuild)
+  # -----------------------------------------------------------------------
+  build-macos:
+    name: Build macOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set VERSION from tag
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
+
+      - name: Build macOS tarballs (amd64 + arm64)
+        run: VERSION=${{ env.VERSION }} bash build-macos.sh
+
+      - name: Build macOS .pkg installers (unsigned)
+        run: |
+          VERSION=${{ env.VERSION }} bash build-macos-pkg.sh
+          # build-macos-pkg.sh prepares the payload; run the on-mac helper
+          cd dist && bash build-pkg-on-macos.sh
+
+      - name: Create universal binary tarballs (lipo)
+        run: |
+          cd dist
+          mkdir -p darwin-universal/bin
+          for cmd in darwin-amd64/bin/*; do
+            base=$(basename "$cmd")
+            lipo -create "darwin-amd64/bin/$base" "darwin-arm64/bin/$base" \
+              -output "darwin-universal/bin/$base"
+          done
+          tar -czf "bvbrc-cli-${{ env.VERSION }}-darwin-universal.tar.gz" \
+            -C darwin-universal bin
+          echo "Created darwin-universal tarball"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-dist
+          path: |
+            dist/bvbrc-cli-*-darwin-*.tar.gz
+            dist/bvbrc-cli-*-darwin-*.pkg
+            dist/bvbrc-cli-*-intel.pkg
+            dist/bvbrc-cli-*-apple-silicon.pkg
+          retention-days: 1
+
+  # -----------------------------------------------------------------------
+  # Job 3: Windows .zip + NSIS .exe installer  (windows runner for makensis)
+  # -----------------------------------------------------------------------
+  build-windows:
+    name: Build Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set VERSION from tag
+        shell: bash
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
+
+      - name: Install zip
+        shell: pwsh
+        run: choco install zip -y --no-progress
+
+      - name: Build Windows .zip packages
+        shell: bash
+        run: VERSION=${{ env.VERSION }} bash build-windows.sh
+
+      - name: Install NSIS
+        shell: pwsh
+        run: choco install nsis -y --no-progress
+
+      - name: Build NSIS .exe installer (amd64)
+        shell: pwsh
+        run: |
+          $version = $env:VERSION
+          $nsiDir = "dist\nsis"
+          # Copy binaries into nsis dir for makensis
+          Copy-Item "dist\windows-amd64\*.exe" "$nsiDir\"
+          # Update version in .nsi script
+          (Get-Content "$nsiDir\bvbrc-cli.nsi") `
+            -replace '!define APP_VERSION ".*"', "!define APP_VERSION `"$version`"" |
+            Set-Content "$nsiDir\bvbrc-cli.nsi"
+          # Build
+          & "C:\Program Files (x86)\NSIS\makensis.exe" "$nsiDir\bvbrc-cli.nsi"
+          Move-Item "BV-BRC-CLI-Setup.exe" "dist\bvbrc-cli-$version-windows-amd64-setup.exe"
+        env:
+          VERSION: ${{ env.VERSION }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-dist
+          path: |
+            dist/bvbrc-cli-*-windows-*.zip
+            dist/bvbrc-cli-*-windows-*-setup.exe
+          retention-days: 1
+
+  # -----------------------------------------------------------------------
+  # Job 4: Collect all artifacts, generate checksums, publish the release
+  # -----------------------------------------------------------------------
+  release:
+    name: Publish Release
+    needs: [build-linux, build-macos, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set VERSION from tag
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Generate checksums
+        working-directory: release-assets
+        run: |
+          sha256sum bvbrc-cli-* bvbrc-cli_* 2>/dev/null | \
+            tee bvbrc-cli-${{ env.VERSION }}-checksums.sha256
+
+      - name: List release assets
+        working-directory: release-assets
+        run: ls -lh
+
+      - name: Upload assets to GitHub Release
+        working-directory: release-assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ github.ref_name }}" \
+            bvbrc-cli-${{ env.VERSION }}-linux-amd64.tar.gz \
+            bvbrc-cli-${{ env.VERSION }}-linux-arm64.tar.gz \
+            bvbrc-cli_${{ env.VERSION }}_amd64.deb \
+            bvbrc-cli_${{ env.VERSION }}_arm64.deb \
+            bvbrc-cli-${{ env.VERSION }}-darwin-amd64.tar.gz \
+            bvbrc-cli-${{ env.VERSION }}-darwin-arm64.tar.gz \
+            bvbrc-cli-${{ env.VERSION }}-darwin-universal.tar.gz \
+            bvbrc-cli-${{ env.VERSION }}-windows-amd64.zip \
+            bvbrc-cli-${{ env.VERSION }}-windows-arm64.zip \
+            bvbrc-cli-${{ env.VERSION }}-checksums.sha256 \
+            $(ls bvbrc-cli-*-darwin-*.pkg bvbrc-cli-*-intel.pkg \
+                bvbrc-cli-*-apple-silicon.pkg \
+                bvbrc-cli-*-windows-*-setup.exe 2>/dev/null || true) \
+            --repo ${{ github.repository }} \
+            --clobber
