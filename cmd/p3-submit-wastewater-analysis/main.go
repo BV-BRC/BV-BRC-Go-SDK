@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cli"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/readspec"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/appservice"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/auth"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/workspace"
@@ -38,6 +39,15 @@ var (
 
 var validStrategies = map[string]bool{
 	"onecodex": true,
+}
+
+// validPrimers mirrors ReadSpec::LEGAL_PRIMERS, which keys on the combined
+// "<type>,<version>" form accepted by the Perl --primers option.
+var validPrimers = map[string]bool{
+	"ARTIC,V5.3.2": true, "ARTIC,V4.1": true, "ARTIC,V4": true,
+	"ARTIC,V3": true, "ARTIC,V2": true, "ARTIC,V1": true,
+	"midnight,V1": true, "qiagen,V1": true, "swift,V1": true,
+	"varskip,V2": true, "varskip,V1a": true, "varskip-long,V1a": true,
 }
 
 var rootCmd = &cobra.Command{
@@ -69,7 +79,7 @@ func init() {
 	rootCmd.Flags().StringArrayVar(&singleEndLibs, "single-end-lib", nil, "single-end read library")
 	rootCmd.Flags().StringArrayVar(&srrIDs, "srr-id", nil, "SRA run ID")
 	rootCmd.Flags().StringVar(&strategy, "strategy", "onecodex", "analysis strategy")
-	rootCmd.Flags().StringVar(&primers, "primers", "ARTIC", "primer set name")
+	rootCmd.Flags().StringVar(&primers, "primers", "ARTIC", "primer set name (Perl's combined \"type,version\" form is also accepted)")
 	rootCmd.Flags().StringVar(&primerVersion, "primer-version", "V5.3.2", "primer version")
 	rootCmd.Flags().StringVar(&sampleDate, "date", "", "sample date (MM/DD/YYYY)")
 }
@@ -81,6 +91,17 @@ func run(cmd *cobra.Command, args []string) error {
 	// Validate strategy
 	if !validStrategies[strategy] {
 		return fmt.Errorf("invalid strategy: %s", strategy)
+	}
+
+	// Perl spells this as a single option, --primers <type>,<version>. Accept
+	// that form here so an invocation copied from the Perl tool does not
+	// silently land the whole string in "primers" with a default version.
+	if t, v, ok := strings.Cut(primers, ","); ok {
+		primers, primerVersion = t, v
+	}
+	if !validPrimers[primers+","+primerVersion] {
+		return fmt.Errorf("invalid primer spec %q: %s,%s is not a known primer set/version",
+			primers+","+primerVersion, primers, primerVersion)
 	}
 
 	// Validate input
@@ -123,6 +144,21 @@ func run(cmd *cobra.Command, args []string) error {
 		"single_end_libs": []map[string]interface{}{},
 	}
 
+	// Perl: ReadSpec->new($uploader, samples => 1, analysis => 1)
+	reads := readspec.Options{Samples: true, Analysis: true}
+
+	// analysisFields adds the per-library keys that Perl's ReadSpec
+	// _tweakLibs2 contributes. SARS2Wastewater.json names the date field
+	// "sample_level_date"; "sample_date" is not in the spec.
+	analysisFields := func(lib map[string]interface{}) map[string]interface{} {
+		lib["primers"] = primers
+		lib["primer_version"] = primerVersion
+		if sampleDate != "" {
+			lib["sample_level_date"] = sampleDate
+		}
+		return lib
+	}
+
 	pairedLibs := params["paired_end_libs"].([]map[string]interface{})
 	for _, lib := range pairedEndLibs {
 		parts := strings.Split(lib, ",")
@@ -137,16 +173,7 @@ func run(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-		libEntry := map[string]interface{}{
-			"read1":         read1,
-			"read2":         read2,
-			"primers":       primers,
-			"primer_version": primerVersion,
-		}
-		if sampleDate != "" {
-			libEntry["sample_date"] = sampleDate
-		}
-		pairedLibs = append(pairedLibs, libEntry)
+		pairedLibs = append(pairedLibs, analysisFields(reads.PairedLib(read1, read2)))
 	}
 	params["paired_end_libs"] = pairedLibs
 
@@ -156,32 +183,17 @@ func run(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-		libEntry := map[string]interface{}{
-			"read":          read,
-			"primers":       primers,
-			"primer_version": primerVersion,
-		}
-		if sampleDate != "" {
-			libEntry["sample_date"] = sampleDate
-		}
-		singleLibs = append(singleLibs, libEntry)
+		singleLibs = append(singleLibs, analysisFields(reads.SingleLib(read)))
 	}
 	params["single_end_libs"] = singleLibs
 
+	// SARS2Wastewater.json declares "srr_libs", not "srr_ids".
 	if len(srrIDs) > 0 {
 		var srrEntries []map[string]interface{}
 		for _, srr := range srrIDs {
-			entry := map[string]interface{}{
-				"srr_accession":  srr,
-				"primers":        primers,
-				"primer_version": primerVersion,
-			}
-			if sampleDate != "" {
-				entry["sample_date"] = sampleDate
-			}
-			srrEntries = append(srrEntries, entry)
+			srrEntries = append(srrEntries, analysisFields(reads.SRREntry(srr)))
 		}
-		params["srr_ids"] = srrEntries
+		params[reads.SRRKey()] = srrEntries
 	}
 
 	startParams := appservice.StartParams{}
