@@ -17,6 +17,7 @@ import (
 
 	"github.com/BV-BRC/BV-BRC-Go-SDK/api"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cli"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/readspec"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/appservice"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/auth"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/workspace"
@@ -162,7 +163,6 @@ func run(cmd *cobra.Command, args []string) error {
 		"output_file":         outputName,
 		"paired_end_libs":     []map[string]interface{}{},
 		"single_end_libs":     []map[string]interface{}{},
-		"srr_ids":             []string{},
 	}
 
 	// Track conditions for contrasts
@@ -225,17 +225,19 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 	params["single_end_libs"] = singleLibs
 
-	// Process SRR IDs
+	// Process SRR IDs. Perl: ReadSpec->new($uploader, rnaseq => 1), which
+	// sets srr_label = "srr_libs". RNASeq.json declares "srr_libs" and has
+	// no "srr_ids" parameter, so the old key was dropped at submit.
+	reads := readspec.Options{RNASeq: true}
 	var srrList []map[string]interface{}
 	for _, srr := range srrIDs {
 		condIdx := getConditionIndex(currentCondition)
-		srrList = append(srrList, map[string]interface{}{
-			"srr_accession": srr,
-			"condition":     condIdx,
-		})
+		entry := reads.SRREntry(srr)
+		entry["condition"] = condIdx
+		srrList = append(srrList, entry)
 	}
 	if len(srrList) > 0 {
-		params["srr_ids"] = srrList
+		params[reads.SRRKey()] = srrList
 	}
 
 	// Add experimental conditions

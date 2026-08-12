@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cli"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/readspec"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/appservice"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/auth"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/workspace"
@@ -201,6 +202,9 @@ func run(cmd *cobra.Command, args []string) error {
 		"single_end_libs":             []map[string]interface{}{},
 	}
 
+	// Perl: ReadSpec->new($uploader, simple => 1, samples => 1)
+	reads := readspec.Options{Simple: true, Samples: true}
+
 	// Process paired-end libraries
 	pairedLibs := params["paired_end_libs"].([]map[string]interface{})
 	for _, lib := range pairedEndLibs {
@@ -216,10 +220,7 @@ func run(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-		pairedLibs = append(pairedLibs, map[string]interface{}{
-			"read1": read1,
-			"read2": read2,
-		})
+		pairedLibs = append(pairedLibs, reads.PairedLib(read1, read2))
 	}
 	params["paired_end_libs"] = pairedLibs
 
@@ -230,15 +231,19 @@ func run(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-		singleLibs = append(singleLibs, map[string]interface{}{
-			"read": read,
-		})
+		singleLibs = append(singleLibs, reads.SingleLib(read))
 	}
 	params["single_end_libs"] = singleLibs
 
-	// Add SRR IDs
+	// Add SRA libraries. TaxonomicClassification.json declares "srr_libs"
+	// with {sample_id, srr_accession} entries; a bare "srr_ids" list is not
+	// in the spec and would be dropped at submit.
 	if len(srrIDs) > 0 {
-		params["srr_ids"] = srrIDs
+		srrLibs := make([]map[string]interface{}, 0, len(srrIDs))
+		for _, id := range srrIDs {
+			srrLibs = append(srrLibs, reads.SRREntry(id))
+		}
+		params[reads.SRRKey()] = srrLibs
 	}
 
 	startParams := appservice.StartParams{}
