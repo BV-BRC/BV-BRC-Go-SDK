@@ -30,6 +30,7 @@ var (
 	pairedEndLib string
 	singleEndLib string
 	srrID        string
+	validateSRR  bool
 	strategy     string
 )
 
@@ -61,9 +62,10 @@ func init() {
 	rootCmd.Flags().BoolVarP(&overwrite, "overwrite", "f", false, "overwrite existing files")
 	rootCmd.Flags().BoolVar(&dryRun, "dry-run", false, "validate but don't submit")
 
-	rootCmd.Flags().StringVar(&pairedEndLib, "paired-end-lib", "", "paired-end read library (file1,file2)")
+	rootCmd.Flags().StringVar(&pairedEndLib, "paired-end-lib", "", cli.PairedEndLibUsage)
 	rootCmd.Flags().StringVar(&singleEndLib, "single-end-lib", "", "single-end read library")
 	rootCmd.Flags().StringVar(&srrID, "srr-id", "", "SRA run ID")
+	rootCmd.Flags().BoolVar(&validateSRR, "validate-srr", false, cli.ValidateSRRUsage)
 	rootCmd.Flags().StringVar(&strategy, "strategy", "auto", "assembly strategy (auto, IRMA)")
 }
 
@@ -120,6 +122,13 @@ func run(cmd *cobra.Command, args []string) error {
 		workspaceUploadDir = outputPath
 	}
 
+	// Look the SRA accessions up before touching any read files, so a bad
+	// accession fails the run before anything is uploaded.
+	if _, err := cli.LookupSRRTitles(validateSRR, []string{srrID}); err != nil {
+		cmd.SilenceUsage = true
+		return err
+	}
+
 	params := map[string]interface{}{
 		"recipe":      strategy,
 		"module":      "FLU",
@@ -128,15 +137,15 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	if pairedEndLib != "" {
-		parts := strings.Split(pairedEndLib, ",")
-		if len(parts) != 2 {
-			return fmt.Errorf("paired-end library must have two files separated by comma: %s", pairedEndLib)
-		}
-		read1, err := processFilename(ws, parts[0], "reads", token)
+		f1, f2, err := cli.SplitPairedEndLib(pairedEndLib)
 		if err != nil {
 			return err
 		}
-		read2, err := processFilename(ws, parts[1], "reads", token)
+		read1, err := processFilename(ws, f1, "reads", token)
+		if err != nil {
+			return err
+		}
+		read2, err := processFilename(ws, f2, "reads", token)
 		if err != nil {
 			return err
 		}

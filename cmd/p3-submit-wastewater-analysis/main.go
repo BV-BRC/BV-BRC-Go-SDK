@@ -31,6 +31,7 @@ var (
 	pairedEndLibs []string
 	singleEndLibs []string
 	srrIDs        []string
+	validateSRR   bool
 	strategy      string
 	primers       string
 	primerVersion string
@@ -75,9 +76,10 @@ func init() {
 	rootCmd.Flags().BoolVarP(&overwrite, "overwrite", "f", false, "overwrite existing files")
 	rootCmd.Flags().BoolVar(&dryRun, "dry-run", false, "validate but don't submit")
 
-	rootCmd.Flags().StringArrayVar(&pairedEndLibs, "paired-end-lib", nil, "paired-end read library (file1,file2)")
+	rootCmd.Flags().StringArrayVar(&pairedEndLibs, "paired-end-lib", nil, cli.PairedEndLibUsage)
 	rootCmd.Flags().StringArrayVar(&singleEndLibs, "single-end-lib", nil, "single-end read library")
 	rootCmd.Flags().StringArrayVar(&srrIDs, "srr-id", nil, "SRA run ID")
+	rootCmd.Flags().BoolVar(&validateSRR, "validate-srr", false, cli.ValidateSRRUsage)
 	rootCmd.Flags().StringVar(&strategy, "strategy", "onecodex", "analysis strategy")
 	rootCmd.Flags().StringVar(&primers, "primers", "ARTIC", "primer set name (Perl's combined \"type,version\" form is also accepted)")
 	rootCmd.Flags().StringVar(&primerVersion, "primer-version", "V5.3.2", "primer version")
@@ -135,6 +137,14 @@ func run(cmd *cobra.Command, args []string) error {
 		workspaceUploadDir = outputPath
 	}
 
+	// Look the SRA accessions up before touching any read files, so a bad
+	// accession fails the run before anything is uploaded.
+	srrTitles, err := cli.LookupSRRTitles(validateSRR, srrIDs)
+	if err != nil {
+		cmd.SilenceUsage = true
+		return err
+	}
+
 	params := map[string]interface{}{
 		"output_path":    outputPath,
 		"output_file":    outputName,
@@ -161,15 +171,15 @@ func run(cmd *cobra.Command, args []string) error {
 
 	pairedLibs := params["paired_end_libs"].([]map[string]interface{})
 	for _, lib := range pairedEndLibs {
-		parts := strings.Split(lib, ",")
-		if len(parts) != 2 {
-			return fmt.Errorf("paired-end library must have two files separated by comma: %s", lib)
-		}
-		read1, err := processFilename(ws, parts[0], "reads", token)
+		f1, f2, err := cli.SplitPairedEndLib(lib)
 		if err != nil {
 			return err
 		}
-		read2, err := processFilename(ws, parts[1], "reads", token)
+		read1, err := processFilename(ws, f1, "reads", token)
+		if err != nil {
+			return err
+		}
+		read2, err := processFilename(ws, f2, "reads", token)
 		if err != nil {
 			return err
 		}
@@ -191,7 +201,13 @@ func run(cmd *cobra.Command, args []string) error {
 	if len(srrIDs) > 0 {
 		var srrEntries []map[string]interface{}
 		for _, srr := range srrIDs {
-			srrEntries = append(srrEntries, analysisFields(reads.SRREntry(srr)))
+			entry := analysisFields(reads.SRREntry(srr))
+			// The web UI records the SRA study title alongside the accession;
+			// match that when --validate-srr gave us one.
+			if title := srrTitles[srr]; title != "" {
+				entry["title"] = title
+			}
+			srrEntries = append(srrEntries, entry)
 		}
 		params[reads.SRRKey()] = srrEntries
 	}
