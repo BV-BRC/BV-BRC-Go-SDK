@@ -34,6 +34,7 @@ var (
 	interleavedLibs  []string
 	singleEndLibs    []string
 	srrIDs           []string
+	validateSRR      bool
 	platform         string
 	readOrientation  string
 
@@ -76,10 +77,11 @@ func init() {
 	rootCmd.Flags().StringVar(&containerID, "container-id", "", "container ID")
 
 	// Read library options
-	rootCmd.Flags().StringArrayVar(&pairedEndLibs, "paired-end-lib", nil, "paired-end read library (file1,file2)")
+	rootCmd.Flags().StringArrayVar(&pairedEndLibs, "paired-end-lib", nil, cli.PairedEndLibUsage)
 	rootCmd.Flags().StringArrayVar(&interleavedLibs, "interleaved-lib", nil, "interleaved paired-end library")
 	rootCmd.Flags().StringArrayVar(&singleEndLibs, "single-end-lib", nil, "single-end read library")
 	rootCmd.Flags().StringArrayVar(&srrIDs, "srr-id", nil, "SRA run ID")
+	rootCmd.Flags().BoolVar(&validateSRR, "validate-srr", false, cli.ValidateSRRUsage)
 	rootCmd.Flags().StringVar(&platform, "platform", "infer", "sequencing platform (infer, illumina, pacbio, nanopore, iontorrent)")
 	rootCmd.Flags().StringVar(&readOrientation, "read-orientation", "inward", "read orientation (inward, outward)")
 
@@ -132,6 +134,13 @@ func run(cmd *cobra.Command, args []string) error {
 		workspaceUploadDir = outputPath
 	}
 
+	// Look the SRA accessions up before touching any read files, so a bad
+	// accession fails the run before anything is uploaded.
+	if _, err := cli.LookupSRRTitles(validateSRR, srrIDs); err != nil {
+		cmd.SilenceUsage = true
+		return err
+	}
+
 	readOrientationOutward := readOrientation == "outward"
 
 	// Build parameters
@@ -160,15 +169,15 @@ func run(cmd *cobra.Command, args []string) error {
 	// Process paired-end libraries
 	pairedLibs := params["paired_end_libs"].([]map[string]interface{})
 	for _, lib := range pairedEndLibs {
-		parts := strings.Split(lib, ",")
-		if len(parts) != 2 {
-			return fmt.Errorf("paired-end library must have two files separated by comma: %s", lib)
-		}
-		read1, err := processFilename(ws, parts[0], token)
+		f1, f2, err := cli.SplitPairedEndLib(lib)
 		if err != nil {
 			return err
 		}
-		read2, err := processFilename(ws, parts[1], token)
+		read1, err := processFilename(ws, f1, token)
+		if err != nil {
+			return err
+		}
+		read2, err := processFilename(ws, f2, token)
 		if err != nil {
 			return err
 		}

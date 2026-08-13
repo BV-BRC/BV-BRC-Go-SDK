@@ -5,7 +5,7 @@ set -e
 
 cd "$(dirname "$0")"
 
-VERSION="${VERSION:-1.0.0}"
+VERSION="${VERSION:-$(sh "$(dirname "$0")/scripts/version.sh")}"
 export VERSION
 
 echo "========================================"

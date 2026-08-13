@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"  ?>
+<EXPERIMENT_PACKAGE_SET>
+<EXPERIMENT_PACKAGE>
+  <EXPERIMENT accession="SRX34779904" alias="LJ20260806">
+    <IDENTIFIERS><PRIMARY_ID>SRX34779904</PRIMARY_ID></IDENTIFIERS>
+    <TITLE>SARS-CoV-2: wastewater surveillance sample from PCR amplicon-based whole genome sequencing of wastewater samples</TITLE>
+    <STUDY_REF accession="SRP393881"><IDENTIFIERS><PRIMARY_ID>SRP393881</PRIMARY_ID></IDENTIFIERS></STUDY_REF>
+  </EXPERIMENT>
+  <SUBMISSION accession="SRA2511114" center_name="CDPHE-COVID"/>
+  <STUDY center_name="BioProject" alias="PRJNA850375" accession="SRP393881">
+    <IDENTIFIERS><PRIMARY_ID>SRP393881</PRIMARY_ID></IDENTIFIERS>
+    <DESCRIPTOR>
+      <STUDY_TITLE>SARS-CoV-2 Colorado wastewater genomic surveillance Raw sequence reads</STUDY_TITLE>
+      <STUDY_TYPE existing_study_type="Metagenomics"/>
+    </DESCRIPTOR>
+  </STUDY>
+  <RUN_SET runs="2" bases="54553862" spots="274049">
+    <RUN accession="SRR40145022" alias="2608070010_R1_scrubbed.fastq.gz" total_spots="274049">
+      <IDENTIFIERS><PRIMARY_ID>SRR40145022</PRIMARY_ID></IDENTIFIERS>
+    </RUN>
+    <RUN accession="SRR40145099" alias="2608070010_R2_scrubbed.fastq.gz" total_spots="274049">
+      <IDENTIFIERS><PRIMARY_ID>SRR40145099</PRIMARY_ID></IDENTIFIERS>
+    </RUN>
+  </RUN_SET>
+</EXPERIMENT_PACKAGE>
+<EXPERIMENT_PACKAGE>
+  <EXPERIMENT accession="SRX34779903" alias="LJ20260805">
+    <IDENTIFIERS><PRIMARY_ID>SRX34779903</PRIMARY_ID></IDENTIFIERS>
+    <TITLE>SARS-CoV-2: wastewater surveillance sample from Wastewater metagenome</TITLE>
+    <STUDY_REF accession="SRP393881"><IDENTIFIERS><PRIMARY_ID>SRP393881</PRIMARY_ID></IDENTIFIERS></STUDY_REF>
+  </EXPERIMENT>
+  <STUDY center_name="BioProject" alias="PRJNA850375" accession="SRP393881">
+    <IDENTIFIERS><PRIMARY_ID>SRP393881</PRIMARY_ID></IDENTIFIERS>
+    <DESCRIPTOR>
+      <STUDY_TITLE>SARS-CoV-2 Colorado wastewater genomic surveillance Raw sequence reads</STUDY_TITLE>
+    </DESCRIPTOR>
+  </STUDY>
+  <RUN_SET runs="1">
+    <RUN accession="SRR40145023" alias="2608070011_R1_scrubbed.fastq.gz">
+      <IDENTIFIERS><PRIMARY_ID>SRR40145023</PRIMARY_ID></IDENTIFIERS>
+    </RUN>
+  </RUN_SET>
+</EXPERIMENT_PACKAGE>
+</EXPERIMENT_PACKAGE_SET>

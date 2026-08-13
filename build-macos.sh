@@ -6,7 +6,9 @@ set -e
 # Use GO env var if set, then the local dev path if present, then PATH fallback
 GO="${GO:-/home/olson/P3/go-1.25.6/go/bin/go}"
 command -v "$GO" &>/dev/null || GO=go
-VERSION="${VERSION:-1.0.0}"
+VERSION="${VERSION:-$(sh "$(dirname "$0")/scripts/version.sh")}"
+# Stamp the version into the binaries; it is what the User-Agent reports.
+LDFLAGS_VERSION="-X github.com/BV-BRC/BV-BRC-Go-SDK/version.Version=${VERSION}"
 OUTPUT_DIR="dist"
 PKG_ID="org.bvbrc.cli"
 
@@ -30,7 +32,7 @@ echo ""
 echo "Building for macOS Intel (amd64)..."
 for cmd in $COMMANDS; do
     echo "  $cmd"
-    GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 $GO build -buildvcs=false -ldflags="-s -w" -o "$OUTPUT_DIR/darwin-amd64/bin/$cmd" "./cmd/$cmd"
+    GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 $GO build -buildvcs=false -ldflags="-s -w $LDFLAGS_VERSION" -o "$OUTPUT_DIR/darwin-amd64/bin/$cmd" "./cmd/$cmd"
 done
 
 # Build for macOS Apple Silicon (arm64)
@@ -38,7 +40,7 @@ echo ""
 echo "Building for macOS Apple Silicon (arm64)..."
 for cmd in $COMMANDS; do
     echo "  $cmd"
-    GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 $GO build -buildvcs=false -ldflags="-s -w" -o "$OUTPUT_DIR/darwin-arm64/bin/$cmd" "./cmd/$cmd"
+    GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 $GO build -buildvcs=false -ldflags="-s -w $LDFLAGS_VERSION" -o "$OUTPUT_DIR/darwin-arm64/bin/$cmd" "./cmd/$cmd"
 done
 
 # Create universal binaries using lipo (if available)
