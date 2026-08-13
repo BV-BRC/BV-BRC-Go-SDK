@@ -17,6 +17,7 @@ import (
 
 	"github.com/BV-BRC/BV-BRC-Go-SDK/api"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cli"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/readspec"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/appservice"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/auth"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/workspace"
@@ -33,6 +34,7 @@ var (
 	pairedEndLibs   []string
 	singleEndLibs   []string
 	srrIDs          []string
+	validateSRR     bool
 	currentCondition string
 
 	// Processing options
@@ -84,9 +86,10 @@ func init() {
 	rootCmd.Flags().BoolVar(&dryRun, "dry-run", false, "validate but don't submit")
 
 	// Read library options
-	rootCmd.Flags().StringArrayVar(&pairedEndLibs, "paired-end-lib", nil, "paired-end read library (file1,file2)")
+	rootCmd.Flags().StringArrayVar(&pairedEndLibs, "paired-end-lib", nil, cli.PairedEndLibUsage)
 	rootCmd.Flags().StringArrayVar(&singleEndLibs, "single-end-lib", nil, "single-end read library")
 	rootCmd.Flags().StringArrayVar(&srrIDs, "srr-id", nil, "SRA run ID")
+	rootCmd.Flags().BoolVar(&validateSRR, "validate-srr", false, cli.ValidateSRRUsage)
 	rootCmd.Flags().StringVar(&currentCondition, "condition", "", "condition name for following libraries")
 
 	// Processing options
@@ -154,6 +157,14 @@ func run(cmd *cobra.Command, args []string) error {
 		workspaceUploadDir = outputPath
 	}
 
+	// Look the SRA accessions up before touching any read files, so a bad
+	// accession fails the run before anything is uploaded.
+	srrTitles, err := cli.LookupSRRTitles(validateSRR, srrIDs)
+	if err != nil {
+		cmd.SilenceUsage = true
+		return err
+	}
+
 	// Build parameters
 	params := map[string]interface{}{
 		"recipe":              recipe,
@@ -162,7 +173,6 @@ func run(cmd *cobra.Command, args []string) error {
 		"output_file":         outputName,
 		"paired_end_libs":     []map[string]interface{}{},
 		"single_end_libs":     []map[string]interface{}{},
-		"srr_ids":             []string{},
 	}
 
 	// Track conditions for contrasts
@@ -189,15 +199,15 @@ func run(cmd *cobra.Command, args []string) error {
 	// like the Perl version. For simplicity, we use a single --condition that applies to all.
 	pairedLibs := params["paired_end_libs"].([]map[string]interface{})
 	for _, lib := range pairedEndLibs {
-		parts := strings.Split(lib, ",")
-		if len(parts) != 2 {
-			return fmt.Errorf("paired-end library must have two files separated by comma: %s", lib)
-		}
-		read1, err := processFilename(ws, parts[0], "reads", token)
+		f1, f2, err := cli.SplitPairedEndLib(lib)
 		if err != nil {
 			return err
 		}
-		read2, err := processFilename(ws, parts[1], "reads", token)
+		read1, err := processFilename(ws, f1, "reads", token)
+		if err != nil {
+			return err
+		}
+		read2, err := processFilename(ws, f2, "reads", token)
 		if err != nil {
 			return err
 		}
@@ -225,17 +235,24 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 	params["single_end_libs"] = singleLibs
 
-	// Process SRR IDs
+	// Process SRR IDs. Perl: ReadSpec->new($uploader, rnaseq => 1), which
+	// sets srr_label = "srr_libs". RNASeq.json declares "srr_libs" and has
+	// no "srr_ids" parameter, so the old key was dropped at submit.
+	reads := readspec.Options{RNASeq: true}
 	var srrList []map[string]interface{}
 	for _, srr := range srrIDs {
 		condIdx := getConditionIndex(currentCondition)
-		srrList = append(srrList, map[string]interface{}{
-			"srr_accession": srr,
-			"condition":     condIdx,
-		})
+		entry := reads.SRREntry(srr)
+		entry["condition"] = condIdx
+		// The web UI records the SRA study title alongside the accession;
+		// match that when --validate-srr gave us one.
+		if title := srrTitles[srr]; title != "" {
+			entry["title"] = title
+		}
+		srrList = append(srrList, entry)
 	}
 	if len(srrList) > 0 {
-		params["srr_ids"] = srrList
+		params[reads.SRRKey()] = srrList
 	}
 
 	// Add experimental conditions

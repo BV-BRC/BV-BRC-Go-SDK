@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/BV-BRC/BV-BRC-Go-SDK/version"
 )
 
 const (
@@ -21,12 +23,14 @@ const (
 	DefaultChunkSize = 25000
 	// DefaultMaxRetries is the default number of retry attempts for failed requests.
 	DefaultMaxRetries = 3
-	// DefaultUserAgent is sent on every request. The data API sits behind
-	// Cloudflare, which bans default library user-agents (error 1010); this
-	// value is allowlisted at the edge. Override via WithUserAgent or the
-	// P3_USER_AGENT environment variable.
-	DefaultUserAgent = "BV-BRC P3 Client"
 )
+
+// DefaultUserAgent is sent on every request unless overridden: the library
+// name and build version, e.g. "bvbrc-go-sdk/2.0.12". The data API sits behind
+// Cloudflare, which bans some default library user-agents (error 1010), so a
+// request must always name us. Override via WithUserAgent or the
+// P3_USER_AGENT environment variable, which version.UserAgent honors.
+var DefaultUserAgent = version.Name + "/" + version.Get()
 
 // Client provides access to the BV-BRC Data API.
 type Client struct {
@@ -122,16 +126,12 @@ func WithUserAgent(ua string) ClientOption {
 
 // NewClient creates a new BV-BRC API client with the given options.
 func NewClient(opts ...ClientOption) *Client {
-	ua := os.Getenv("P3_USER_AGENT")
-	if ua == "" {
-		ua = DefaultUserAgent
-	}
 	c := &Client{
 		BaseURL:    DefaultBaseURL,
 		HTTPClient: &http.Client{Timeout: 30 * time.Second},
 		ChunkSize:  DefaultChunkSize,
 		MaxRetries: DefaultMaxRetries,
-		UserAgent:  ua,
+		UserAgent:  version.UserAgent(),
 	}
 	for _, opt := range opts {
 		opt(c)
@@ -471,7 +471,7 @@ func (c *Client) setHeaders(req *http.Request) {
 	}
 	ua := c.UserAgent
 	if ua == "" {
-		ua = DefaultUserAgent
+		ua = version.UserAgent()
 	}
 	req.Header.Set("User-Agent", ua)
 }

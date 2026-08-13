@@ -44,7 +44,7 @@ reflects. Status ✅ = verified current as of the date shown.
 
 | Go command | Perl script | Synced to | p3_cli date | Status |
 |---|---|---|---|---|
-| p3-all-genomes | p3-all-genomes.pl | `0ddd93c` | 2025-06-04 | ✅ |
+| p3-all-genomes | p3-all-genomes.pl | `0ddd93c` | 2025-06-04 | ✅ id-centric fix 2026-06 |
 | p3-count | p3-count.pl | `9fbdbfe` | 2021-09-01 | ✅ |
 | p3-echo | p3-echo.pl | `4049829` | 2019-10-25 | ✅ |
 | p3-extract | p3-extract.pl | `4049829` | 2019-10-25 | ✅ |
@@ -83,14 +83,14 @@ reflects. Status ✅ = verified current as of the date shown.
 | p3-submit-wastewater-analysis | p3-submit-wastewater-analysis.pl | `42794ce` | 2024-06-11 | ✅ |
 | p3-submit-whole-genome-SNP-analysis | p3-submit-whole-genome-SNP-analysis.pl | `a7ad47f` | 2026-04-08 | ✅ ported 2026-06 |
 | p3-tail | p3-tail.pl | `4049829` | 2019-10-25 | ✅ |
-| p3-all-contigs | p3-all-contigs.pl | `0ddd93c` | 2025-06-04 | ✅ ported 2026-06 |
-| p3-all-drugs | p3-all-drugs.pl | `0ddd93c` | 2025-06-04 | ✅ ported 2026-06 |
-| p3-all-genome-features | p3-all-genome-features.pl | `9d6470a` | 2025-06-06 | ✅ ported 2026-06 |
-| p3-all-sfs | p3-all-sfs.pl | `0ddd93c` | 2025-06-04 | ✅ ported 2026-06 |
-| p3-all-sfvts | p3-all-sfvts.pl | `0ddd93c` | 2025-06-04 | ✅ ported 2026-06 |
-| p3-all-subsystem-roles | p3-all-subsystem-roles.pl | `0ddd93c` | 2025-06-04 | ✅ ported 2026-06 |
-| p3-all-subsystems | p3-all-subsystems.pl | `0ddd93c` | 2025-06-04 | ✅ ported 2026-06 |
-| p3-all-taxonomies | p3-all-taxonomies.pl | `0ddd93c` | 2025-06-04 | ✅ ported 2026-06 |
+| p3-all-contigs | p3-all-contigs.pl | `0ddd93c` | 2025-06-04 | ✅ ported 2026-06; id-centric fix |
+| p3-all-drugs | p3-all-drugs.pl | `0ddd93c` | 2025-06-04 | ✅ ported 2026-06; id-centric fix |
+| p3-all-genome-features | p3-all-genome-features.pl | `9d6470a` | 2025-06-06 | ✅ ported 2026-06; id-centric fix |
+| p3-all-sfs | p3-all-sfs.pl | `0ddd93c` | 2025-06-04 | ✅ ported 2026-06; id-centric fix |
+| p3-all-sfvts | p3-all-sfvts.pl | `0ddd93c` | 2025-06-04 | ✅ ported 2026-06; id-centric fix |
+| p3-all-subsystem-roles | p3-all-subsystem-roles.pl | `0ddd93c` | 2025-06-04 | ✅ ported 2026-06; id-centric fix |
+| p3-all-subsystems | p3-all-subsystems.pl | `0ddd93c` | 2025-06-04 | ✅ ported 2026-06; id-centric fix |
+| p3-all-taxonomies | p3-all-taxonomies.pl | `0ddd93c` | 2025-06-04 | ✅ ported 2026-06; id-centric fix |
 | p3-get-genome-contigs | p3-get-genome-contigs.pl | `79f2ddc` | 2025-07-16 | ✅ ported 2026-06 |
 | p3-get-genome-drugs | p3-get-genome-drugs.pl | `0ddd93c` | 2025-06-04 | ✅ ported 2026-06 |
 | p3-get-genome-expression | p3-get-genome-expression.pl | `0ddd93c` | 2025-06-04 | ✅ ported 2026-06 |
@@ -157,7 +157,8 @@ against p3_cli here:
 - Workspace operations (mirror `Workspace/scripts/`): `p3-cat`, `p3-cp`, `p3-ls`,
   `p3-mkdir`, `p3-rm`
 - Auth / SDK built-ins: `p3-login`, `p3-logout`, `p3-whoami`
-- `p3-all-features` (verify source before treating as a p3_cli port)
+- `p3-all-features` (verify source before treating as a p3_cli port; received the
+  same id-centric output fix as the tracked `p3-all-*` commands)
 
 ---
 
@@ -192,7 +193,7 @@ MISMATCH=0 means Go and Perl emit identical params on every fixture where both s
 
 | Issue | Fix |
 |---|---|
-| Perl data-API stall (Cloudflare 1010 on `patricbrc.org`) | Switched `P3DataAPI` to `bv-brc.org`; added configurable UA (`BV-BRC P3 Client`) |
+| Perl data-API stall (Cloudflare 1010 on `patricbrc.org`) | Switched `P3DataAPI` to `bv-brc.org`; added a configurable UA (Perl sends `BV-BRC P3 Client`, Go now sends `bvbrc-go-sdk/<version>`) |
 | Go rejected `Snippy` mapper/caller (variation) | Added to `validMappers`/`validCallers` |
 | Go virus-type codes used underscore (`MASTADENO_A`) | Corrected to match Perl (`MASTADENOA` etc.) |
 | `progressiveMauve` rejected by both CLIs | Added to Perl `ALIGNER` constant and Go `validAligners` |
@@ -200,6 +201,90 @@ MISMATCH=0 means Go and Perl emit identical params on every fixture where both s
 | Go missing genome-ID validation | Added `api.RequireGenomeIDs` to 5 genome-bearing commands |
 | Perl genome-assembly rejected `--genome-size` | Added to Perl `GetOptions` |
 | Suite stalled on Perl invocations | `user-env.sh` now sourced; `raw_decode` handles trailing output |
+
+### Resolved 2026-06-25
+
+| Issue | Fix |
+|---|---|
+| `p3-all-*` did not emit the data type's ID as the first column (default returned the full field list; `--attr` was returned verbatim) | Added `cli.SelectIDCentricFields`, mirroring Perl `P3Utils::select_clause` with `idFlag=1`: no `--attr` → ID column only; with `--attr` → comma-split and ID prepended unless already present. Applied to all 10 `p3-all-*` commands; `IDColumns` verified against Perl `IDCOL`. |
+
+### Resolved 2026-08-10 — read-library parameter dialects
+
+Three submit commands emitted read libraries in a shape the app spec does not
+declare, so `AppScript::preprocess_parameters` silently dropped them at submit.
+Added `internal/readspec`, which mirrors the dialect selection in Perl's
+`Bio::KBase::AppService::ReadSpec` (the two axes are the SRA parameter *name*,
+`srr_ids` vs `srr_libs`, and the SRA entry *shape*, bare string vs
+`{srr_accession}`), plus the `sample_id` derivation. Its tests are checked
+against output generated by running the real Perl module.
+
+| Command | Bug | Fix |
+|---|---|---|
+| p3-submit-taxonomic-classification | no `sample_id` on any library; `srr_ids` emitted though `TaxonomicClassification.json` declares only `srr_libs` | `readspec.Options{Simple: true, Samples: true}` |
+| p3-submit-wastewater-analysis | no `sample_id`; `srr_ids` instead of `srr_libs`; date emitted as `sample_date`, spec says `sample_level_date` | `readspec.Options{Samples: true, Analysis: true}`; also accepts Perl's combined `--primers <type>,<version>` and validates against `LEGAL_PRIMERS` |
+| p3-submit-rnaseq | `srr_ids` (and an always-present empty `srr_ids` list) though `RNASeq.json` declares only `srr_libs` | `readspec.Options{RNASeq: true}` |
+
+`p3-submit-fastqutils` was already correct in both tools and is unchanged;
+`readspec.Options.SRRKeyOverride` exists to express its dialect (Perl gets there
+by assigning `srr_label` directly after construction). Perl-side defects found
+during the port — all reproduced against the live tools — are written up in
+`doc/PERL-READSPEC-ISSUES.md`; none are fixed here.
+
+### Added 2026-08-13 — SRA accession validation (`sra` package, Go only)
+
+`--srr-id` accessions used to go through unchecked, so a typo surfaced only when
+the job failed staging its reads. The new top-level `sra` package looks
+accessions up at NCBI eutils (`efetch?db=sra&rettype=docset`, the endpoint
+`sra_import/lib/sra_tools.py` already uses) and returns the **study title** —
+the value the web UI records as `title` on a submitted SRA library. One request
+covers a batch; unknown accessions are omitted from the response rather than
+failing it, so every accession is checked and all bad ones are reported at once.
+Experiment (SRX) and study (SRP) accessions resolve too, matching
+`sra_tools.parse_accession_metadata`.
+
+Wired into **all 11 commands that take `--srr-id`** behind **`--validate-srr`**
+(opt-in, off by default; without it there is no network call and the emitted
+params are unchanged). `cli.LookupSRRTitles` (`internal/cli/srr.go`) is the one
+implementation: each accession and its study title go to stderr, unknown
+accessions are each named and then reported together in a single error that
+aborts the run before any upload, and an unreachable NCBI only warns — an eutils
+outage should not block an otherwise-valid submission.
+
+Where the title lands depends on the app's spec, which is why it is not uniform:
+
+| shape | commands | title |
+|---|---|---|
+| `srr_libs` entry objects | `-fastqutils`, `-rnaseq`, `-taxonomic-classification`, `-wastewater-analysis` | added as `title` |
+| bare `srr_ids` list | `-CGA`, `-genome-assembly`, `-metagenome-binning`, `-metagenomic-read-mapping`, `-sars2-assembly`, `-variation-analysis` | nowhere to put it; validation only |
+| single `srr_id` string | `-viral-assembly` | validation only |
+
+This is a deliberate Go-ahead-of-Perl feature; Perl has no equivalent. It does
+not show up as a submit-suite MISMATCH because the suite never passes the flag.
+
+Caveat: **none** of the four `srr_libs` specs (`TaxonomicClassification.json`,
+`RNASeq.json`, `SARS2Wastewater.json`, `FastqUtils.json`) declares `title` in
+its group, so `AppScript::preprocess_parameters` drops the field at runtime. The
+title is recorded in the submitted parameters for provenance and UI parity, not
+consumed by the app.
+
+### Added 2026-08-13 — version stamping and a versioned User-Agent
+
+New top-level `version` package: `version.Get()` is the build version and
+`version.UserAgent()` is `bvbrc-go-sdk/<version>`, now sent by every HTTP client
+in the SDK — the data API, the Workspace and AppService JSONRPC clients, Shock
+downloads, `auth` login, and the NCBI eutils lookups. The JSONRPC, Shock and
+login calls had been sending Go's default `Go-http-client/1.1`; the data API had
+been sending the fixed string `BV-BRC P3 Client`. `P3_USER_AGENT`,
+`WithUserAgent` and `--user-agent` still override.
+
+`scripts/version.sh` supplies the version — `$VERSION` when set (the release
+workflow sets it from the pushed tag), otherwise the tag if HEAD is exactly
+tagged, otherwise the short commit hash — and the `Makefile` and the four
+`build-*.sh` scripts stamp it via `-ldflags -X …/version.Version=…`. A plain
+`go build -buildvcs=false` stamps nothing and reports `bvbrc-go-sdk/unknown`.
+
+Perl is unaffected: `P3DataAPI` keeps sending `BV-BRC P3 Client`. The suite does
+not look at headers, so this changes no result.
 
 ### Remaining ERROR class
 
@@ -230,12 +315,12 @@ Notable categories:
 
 | Gap | Affected apps | Notes |
 |---|---|---|
-| Per-library metadata (`platform`, `sample_id`, `condition`, `date`) in read libs | FastqUtils, Variation, TaxonomicClassification, RNASeq, SARS2Wastewater | Perl ReadSpec supports these; Go does not |
+| Per-library metadata (`platform`, `insert_size_*`, `read_orientation_outward`) in read libs | CGA, GenomeAssembly2, SARS2Assembly, SARS2Wastewater | Neither CLI emits these: Perl `ReadSpec::_processTweaks` has an inverted `assembling` guard that discards them. See `doc/PERL-READSPEC-ISSUES.md` §2 |
 | `fasta_keyboard_input` / `input_type` / `select_genomegroup` | MSA | Newer schema params not yet exposed in either CLI |
 | `module` / `reference_type` / `reference_genome_id` in ViralAssembly | ViralAssembly | Extended options not in current Perl or Go CLI |
 | `bootstraps` in CodonTree | CodonTree | Present in app spec, absent from Perl `GetOptions` and Go |
 | `_preflight` | Variation | Internal scheduler key, not a user-facing option |
-| `srr_libs:platform`, `srr_libs:sample_id`, `srr_libs:title` | FastqUtils, TaxonomicClassification | SRA library metadata; only `srr_accession` is expressible |
+| `srr_libs:platform`, `srr_libs:title` | FastqUtils, TaxonomicClassification | SRA library metadata; only `srr_accession` (and `sample_id`, as of 2026-08) is expressible |
 | `numberOfSequences` | SequenceSubmission | Informational, not a CLI input |
 
 ### Paired-end library syntax — RESOLVED (2026-06-24)

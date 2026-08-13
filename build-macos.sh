@@ -3,12 +3,17 @@
 
 set -e
 
-GO=${GO:-/home/olson/P3/go-1.25.6/go/bin/go}
-VERSION="${VERSION:-1.0.0}"
+# Use GO env var if set, then the local dev path if present, then PATH fallback
+GO="${GO:-/home/olson/P3/go-1.25.6/go/bin/go}"
+command -v "$GO" &>/dev/null || GO=go
+VERSION="${VERSION:-$(sh "$(dirname "$0")/scripts/version.sh")}"
+# Stamp the version into the binaries; it is what the User-Agent reports.
+LDFLAGS_VERSION="-X github.com/BV-BRC/BV-BRC-Go-SDK/version.Version=${VERSION}"
 OUTPUT_DIR="dist"
 PKG_ID="org.bvbrc.cli"
 
 cd "$(dirname "$0")"
+SDK_DIR="$(pwd)"
 
 # Get list of all commands
 COMMANDS=$(ls -d cmd/p3-*/ | xargs -n1 basename)
@@ -27,7 +32,7 @@ echo ""
 echo "Building for macOS Intel (amd64)..."
 for cmd in $COMMANDS; do
     echo "  $cmd"
-    GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 $GO build -buildvcs=false -ldflags="-s -w" -o "$OUTPUT_DIR/darwin-amd64/bin/$cmd" "./cmd/$cmd"
+    GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 $GO build -buildvcs=false -ldflags="-s -w $LDFLAGS_VERSION" -o "$OUTPUT_DIR/darwin-amd64/bin/$cmd" "./cmd/$cmd"
 done
 
 # Build for macOS Apple Silicon (arm64)
@@ -35,7 +40,7 @@ echo ""
 echo "Building for macOS Apple Silicon (arm64)..."
 for cmd in $COMMANDS; do
     echo "  $cmd"
-    GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 $GO build -buildvcs=false -ldflags="-s -w" -o "$OUTPUT_DIR/darwin-arm64/bin/$cmd" "./cmd/$cmd"
+    GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 $GO build -buildvcs=false -ldflags="-s -w $LDFLAGS_VERSION" -o "$OUTPUT_DIR/darwin-arm64/bin/$cmd" "./cmd/$cmd"
 done
 
 # Create universal binaries using lipo (if available)
@@ -62,18 +67,24 @@ echo "Creating distribution archives..."
 
 cd "$OUTPUT_DIR"
 
-# Intel tarball
-tar -czf "bvbrc-cli-${VERSION}-darwin-amd64.tar.gz" -C darwin-amd64 bin
-echo "  Created bvbrc-cli-${VERSION}-darwin-amd64.tar.gz"
+# Each archive expands into a versioned directory containing bin/, README, and
+# LICENSE (rather than a bare bin/).
+stage_darwin() {
+    local plat="$1"   # darwin-amd64 | darwin-arm64 | darwin-universal
+    local stage="bvbrc-cli-${VERSION}-${plat}"
+    rm -rf "$stage"
+    mkdir -p "$stage"
+    cp -R "${plat}/bin" "$stage/bin"
+    bash "$SDK_DIR/scripts/make-readme.sh" "$VERSION" "$plat" > "$stage/README.md"
+    cp "$SDK_DIR/LICENSE" "$stage/LICENSE"
+    tar -czf "${stage}.tar.gz" "$stage"
+    echo "  Created ${stage}.tar.gz"
+}
 
-# ARM64 tarball
-tar -czf "bvbrc-cli-${VERSION}-darwin-arm64.tar.gz" -C darwin-arm64 bin
-echo "  Created bvbrc-cli-${VERSION}-darwin-arm64.tar.gz"
-
-# Universal tarball (if created)
+stage_darwin darwin-amd64
+stage_darwin darwin-arm64
 if [ -d "darwin-universal/bin" ] && [ "$(ls -A darwin-universal/bin)" ]; then
-    tar -czf "bvbrc-cli-${VERSION}-darwin-universal.tar.gz" -C darwin-universal bin
-    echo "  Created bvbrc-cli-${VERSION}-darwin-universal.tar.gz"
+    stage_darwin darwin-universal
 fi
 
 cd ..

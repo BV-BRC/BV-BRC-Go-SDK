@@ -345,6 +345,38 @@ func (d *DataOptions) GetSelectFields(defaultFields []string) []string {
 	return defaultFields
 }
 
+// SelectIDCentricFields computes the output/select column list for the
+// "id-centric" p3-all-* commands, mirroring Perl P3Utils::select_clause with
+// idFlag=1:
+//
+//   - With no --attr, only the ID column is returned (e.g. p3-all-genomes
+//     returns just genome_id).
+//   - With --attr, comma-separated values are split and the ID column is
+//     prepended to the front unless it is already present somewhere in the list.
+//
+// This guarantees the data type's ID is always emitted as the first column.
+func (d *DataOptions) SelectIDCentricFields(idColumn string) []string {
+	// Split comma-joined --attr values (Perl splits on /,/).
+	var attrs []string
+	for _, a := range d.Attr {
+		for _, f := range strings.Split(a, ",") {
+			if f != "" {
+				attrs = append(attrs, f)
+			}
+		}
+	}
+	if len(attrs) == 0 {
+		return []string{idColumn}
+	}
+	for _, f := range attrs {
+		if f == idColumn {
+			// Already requested explicitly; preserve the user's ordering.
+			return attrs
+		}
+	}
+	return append([]string{idColumn}, attrs...)
+}
+
 // ColOptions contains column selection options for input processing.
 type ColOptions struct {
 	// Col is the key column (1-based index or header name, 0 = last column)

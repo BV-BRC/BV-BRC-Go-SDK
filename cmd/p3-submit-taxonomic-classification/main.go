@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cli"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/readspec"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/appservice"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/auth"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/workspace"
@@ -31,6 +32,7 @@ var (
 	pairedEndLibs []string
 	singleEndLibs []string
 	srrIDs        []string
+	validateSRR   bool
 
 	// Classification options
 	is16S            bool
@@ -88,9 +90,10 @@ func init() {
 	rootCmd.Flags().BoolVar(&dryRun, "dry-run", false, "validate but don't submit")
 
 	// Read library options
-	rootCmd.Flags().StringArrayVar(&pairedEndLibs, "paired-end-lib", nil, "paired-end read library (file1,file2)")
+	rootCmd.Flags().StringArrayVar(&pairedEndLibs, "paired-end-lib", nil, cli.PairedEndLibUsage)
 	rootCmd.Flags().StringArrayVar(&singleEndLibs, "single-end-lib", nil, "single-end read library")
 	rootCmd.Flags().StringArrayVar(&srrIDs, "srr-id", nil, "SRA run ID")
+	rootCmd.Flags().BoolVar(&validateSRR, "validate-srr", false, cli.ValidateSRRUsage)
 
 	// Classification options
 	rootCmd.Flags().BoolVar(&is16S, "16S", false, "sample is 16S instead of whole-genome")
@@ -187,6 +190,16 @@ func run(cmd *cobra.Command, args []string) error {
 		workspaceUploadDir = outputPath
 	}
 
+	// Look the SRA accessions up before touching any read files, so a bad
+	// accession fails the run before anything is uploaded.
+	srrTitles, err := cli.LookupSRRTitles(validateSRR, srrIDs)
+	if err != nil {
+		// The accessions are already named on stderr; a usage dump would
+		// scroll them off the screen.
+		cmd.SilenceUsage = true
+		return err
+	}
+
 	// Build parameters
 	params := map[string]interface{}{
 		"analysis_type":               analysisType,
@@ -201,25 +214,25 @@ func run(cmd *cobra.Command, args []string) error {
 		"single_end_libs":             []map[string]interface{}{},
 	}
 
+	// Perl: ReadSpec->new($uploader, simple => 1, samples => 1)
+	reads := readspec.Options{Simple: true, Samples: true}
+
 	// Process paired-end libraries
 	pairedLibs := params["paired_end_libs"].([]map[string]interface{})
 	for _, lib := range pairedEndLibs {
-		parts := strings.Split(lib, ",")
-		if len(parts) != 2 {
-			return fmt.Errorf("paired-end library must have two files separated by comma: %s", lib)
-		}
-		read1, err := processFilename(ws, parts[0], "reads", token)
+		f1, f2, err := cli.SplitPairedEndLib(lib)
 		if err != nil {
 			return err
 		}
-		read2, err := processFilename(ws, parts[1], "reads", token)
+		read1, err := processFilename(ws, f1, "reads", token)
 		if err != nil {
 			return err
 		}
-		pairedLibs = append(pairedLibs, map[string]interface{}{
-			"read1": read1,
-			"read2": read2,
-		})
+		read2, err := processFilename(ws, f2, "reads", token)
+		if err != nil {
+			return err
+		}
+		pairedLibs = append(pairedLibs, reads.PairedLib(read1, read2))
 	}
 	params["paired_end_libs"] = pairedLibs
 
@@ -230,15 +243,25 @@ func run(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-		singleLibs = append(singleLibs, map[string]interface{}{
-			"read": read,
-		})
+		singleLibs = append(singleLibs, reads.SingleLib(read))
 	}
 	params["single_end_libs"] = singleLibs
 
-	// Add SRR IDs
+	// Add SRA libraries. TaxonomicClassification.json declares "srr_libs"
+	// with {sample_id, srr_accession} entries; a bare "srr_ids" list is not
+	// in the spec and would be dropped at submit.
 	if len(srrIDs) > 0 {
-		params["srr_ids"] = srrIDs
+		srrLibs := make([]map[string]interface{}, 0, len(srrIDs))
+		for _, id := range srrIDs {
+			entry := reads.SRREntry(id)
+			// The web UI records the SRA study title alongside the accession;
+			// match that when --validate-srr gave us one.
+			if title := srrTitles[id]; title != "" {
+				entry["title"] = title
+			}
+			srrLibs = append(srrLibs, entry)
+		}
+		params[reads.SRRKey()] = srrLibs
 	}
 
 	startParams := appservice.StartParams{}

@@ -1,0 +1,61 @@
+{% set version = environ.get("VERSION", "2.0.0") %}
+{% set repo = environ.get("GITHUB_REPOSITORY", "BV-BRC/BV-BRC-Go-SDK") %}
+
+package:
+  name: bvbrc-cli
+  version: {{ version }}
+
+# Platform-specific pre-built binary tarballs from GitHub Releases.
+# sha256 values are updated by scripts/update-conda-recipe.sh before each release.
+# {{ repo }} comes from GITHUB_REPOSITORY in CI so the download repo matches the
+# one the release job uploaded to; defaults to the canonical repo for local builds.
+source:
+  - url: https://github.com/{{ repo }}/releases/download/v{{ version }}/bvbrc-cli-{{ version }}-linux-amd64.tar.gz  # [linux and x86_64]
+    sha256: 2a9712d7e0dd9eeea682f93bc5cb2c04e1e3ccebe5af5b6e8f7b501afd8e9b8a  # [linux and x86_64]
+  - url: https://github.com/{{ repo }}/releases/download/v{{ version }}/bvbrc-cli-{{ version }}-linux-arm64.tar.gz  # [linux and aarch64]
+    sha256: 799a33fe2e8bc874ecc5e12fdc4f1e853a5e7bee3ff2f9bb432801bb988f0a78  # [linux and aarch64]
+  - url: https://github.com/{{ repo }}/releases/download/v{{ version }}/bvbrc-cli-{{ version }}-darwin-amd64.tar.gz  # [osx and x86_64]
+    sha256: e3aca65d6a78d52a6155bc2af5493c50d64f971e5c05342d6ee07f1a749c5c6a  # [osx and x86_64]
+  - url: https://github.com/{{ repo }}/releases/download/v{{ version }}/bvbrc-cli-{{ version }}-darwin-arm64.tar.gz  # [osx and arm64]
+    sha256: ad430fcb2b33b0f732fa999548f0d2548924564fb824c1ab2467bf55ac8954f8  # [osx and arm64]
+
+build:
+  number: 0
+  # Binaries are pre-built and statically linked — no compilation during install.
+  # binary_relocation and prefix detection are disabled because Go static binaries
+  # don't use RPATH and don't contain the build prefix.
+  binary_relocation: false
+  detect_binary_files_with_prefix: false
+  skip: true  # [win]
+
+requirements:
+  build: []
+  host: []
+  run: []   # statically linked — zero runtime dependencies
+
+test:
+  commands:
+    - p3-login --help
+    - p3-whoami --help
+    - p3-all-genomes --help
+    - p3-all-contigs --help
+    - p3-get-genome-data --help
+    - p3-get-genome-features --help
+    - p3-submit-genome-assembly --help
+    - p3-job-status --help
+
+about:
+  home: https://www.bv-brc.org
+  license: MIT
+  license_file: LICENSE
+  summary: BV-BRC Command Line Interface Tools
+  description: |
+    Command-line tools for interacting with the BV-BRC (Bacterial and Viral
+    Bioinformatics Resource Center) platform. Includes 101 commands for
+    authentication, workspace management, data queries, and job submission.
+  doc_url: https://www.bv-brc.org/docs/cli_tutorial/
+  dev_url: https://github.com/BV-BRC/BV-BRC-Go-SDK
+
+extra:
+  recipe-maintainers:
+    - olsonanl

@@ -180,3 +180,34 @@ func TestDataOptions_GetSelectFields(t *testing.T) {
 		t.Errorf("GetSelectFields without attrs = %v, want defaults", fields)
 	}
 }
+
+func TestDataOptions_SelectIDCentricFields(t *testing.T) {
+	const id = "genome_id"
+
+	tests := []struct {
+		name string
+		attr []string
+		want []string
+	}{
+		{"no attr -> id only", nil, []string{"genome_id"}},
+		{"attr without id -> id prepended", []string{"genome_name"}, []string{"genome_id", "genome_name"}},
+		{"id already first -> unchanged", []string{"genome_id", "genome_name"}, []string{"genome_id", "genome_name"}},
+		{"id present later -> ordering preserved", []string{"genome_name", "genome_id"}, []string{"genome_name", "genome_id"}},
+		{"comma-joined split + id prepended", []string{"genome_name,genome_length"}, []string{"genome_id", "genome_name", "genome_length"}},
+		{"empty values dropped", []string{"", "genome_name", ""}, []string{"genome_id", "genome_name"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := DataOptions{Attr: tt.attr}
+			got := opts.SelectIDCentricFields(id)
+			if len(got) != len(tt.want) {
+				t.Fatalf("SelectIDCentricFields(%v) = %v, want %v", tt.attr, got, tt.want)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Fatalf("SelectIDCentricFields(%v) = %v, want %v", tt.attr, got, tt.want)
+				}
+			}
+		})
+	}
+}

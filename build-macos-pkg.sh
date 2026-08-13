@@ -3,8 +3,12 @@
 
 set -e
 
-GO=${GO:-/home/olson/P3/go-1.25.6/go/bin/go}
-VERSION="${VERSION:-1.0.0}"
+# Use GO env var if set, then the local dev path if present, then PATH fallback
+GO="${GO:-/home/olson/P3/go-1.25.6/go/bin/go}"
+command -v "$GO" &>/dev/null || GO=go
+VERSION="${VERSION:-$(sh "$(dirname "$0")/scripts/version.sh")}"
+# Stamp the version into the binaries; it is what the User-Agent reports.
+LDFLAGS_VERSION="-X github.com/BV-BRC/BV-BRC-Go-SDK/version.Version=${VERSION}"
 OUTPUT_DIR="dist"
 PKG_ID="org.bvbrc.cli"
 INSTALL_LOCATION="/usr/local"
@@ -43,7 +47,7 @@ build_pkg() {
     echo "Compiling binaries..."
     for cmd in $COMMANDS; do
         echo "  $cmd"
-        GOOS=darwin GOARCH=$ARCH CGO_ENABLED=0 $GO build -buildvcs=false -ldflags="-s -w" -o "$PAYLOAD_DIR/bin/$cmd" "./cmd/$cmd"
+        GOOS=darwin GOARCH=$ARCH CGO_ENABLED=0 $GO build -buildvcs=false -ldflags="-s -w $LDFLAGS_VERSION" -o "$PAYLOAD_DIR/bin/$cmd" "./cmd/$cmd"
     done
 
     # Create postinstall script
@@ -233,6 +237,8 @@ cat > "$OUTPUT_DIR/build-pkg-on-macos.sh" << 'BUILDSCRIPT'
 
 set -e
 
+# Run from dist/, away from the repo, so there is no scripts/version.sh to ask:
+# pass VERSION in (build-macos-pkg.sh prints the value it used).
 VERSION="${VERSION:-1.0.0}"
 
 for ARCH in intel apple-silicon; do

@@ -6,10 +6,12 @@
 GO ?= go
 GOOS ?= $(shell $(GO) env GOOS 2>/dev/null || echo linux)
 GOARCH ?= $(shell $(GO) env GOARCH 2>/dev/null || echo amd64)
-VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+# Tag when HEAD is tagged, short commit hash otherwise; see scripts/version.sh.
+VERSION ?= $(shell sh scripts/version.sh)
 BUILD_TIME ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 
-LDFLAGS := -ldflags "-X main.Version=$(VERSION) -X main.BuildTime=$(BUILD_TIME)"
+VERSION_PKG := github.com/BV-BRC/BV-BRC-Go-SDK/version
+LDFLAGS := -ldflags "-X $(VERSION_PKG).Version=$(VERSION) -X main.Version=$(VERSION) -X main.BuildTime=$(BUILD_TIME)"
 
 # Output directory
 BIN_DIR := bin

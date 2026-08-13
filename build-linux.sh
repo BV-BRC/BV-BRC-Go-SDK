@@ -3,11 +3,16 @@
 
 set -e
 
-GO=${GO:-/home/olson/P3/go-1.25.6/go/bin/go}
-VERSION="${VERSION:-1.0.0}"
+# Use GO env var if set, then the local dev path if present, then PATH fallback
+GO="${GO:-/home/olson/P3/go-1.25.6/go/bin/go}"
+command -v "$GO" &>/dev/null || GO=go
+VERSION="${VERSION:-$(sh "$(dirname "$0")/scripts/version.sh")}"
+# Stamp the version into the binaries; it is what the User-Agent reports.
+LDFLAGS_VERSION="-X github.com/BV-BRC/BV-BRC-Go-SDK/version.Version=${VERSION}"
 OUTPUT_DIR="dist"
 
 cd "$(dirname "$0")"
+SDK_DIR="$(pwd)"
 
 # Get list of all commands
 COMMANDS=$(ls -d cmd/p3-*/ | xargs -n1 basename)
@@ -29,7 +34,7 @@ build_linux() {
 
     for cmd in $COMMANDS; do
         echo "  $cmd"
-        GOOS=linux GOARCH=$ARCH CGO_ENABLED=0 $GO build -buildvcs=false -ldflags="-s -w" -o "$BIN_DIR/$cmd" "./cmd/$cmd"
+        GOOS=linux GOARCH=$ARCH CGO_ENABLED=0 $GO build -buildvcs=false -ldflags="-s -w $LDFLAGS_VERSION" -o "$BIN_DIR/$cmd" "./cmd/$cmd"
     done
 }
 
@@ -46,11 +51,18 @@ echo "Creating distribution archives..."
 
 cd "$OUTPUT_DIR"
 
-tar -czf "bvbrc-cli-${VERSION}-linux-amd64.tar.gz" -C linux-amd64 bin
-echo "  Created bvbrc-cli-${VERSION}-linux-amd64.tar.gz"
-
-tar -czf "bvbrc-cli-${VERSION}-linux-arm64.tar.gz" -C linux-arm64 bin
-echo "  Created bvbrc-cli-${VERSION}-linux-arm64.tar.gz"
+# Each archive expands into a versioned directory containing bin/, README, and
+# LICENSE (rather than a bare bin/).
+for arch in amd64 arm64; do
+    stage="bvbrc-cli-${VERSION}-linux-${arch}"
+    rm -rf "$stage"
+    mkdir -p "$stage"
+    cp -R "linux-${arch}/bin" "$stage/bin"
+    bash "$SDK_DIR/scripts/make-readme.sh" "$VERSION" "linux-${arch}" > "$stage/README.md"
+    cp "$SDK_DIR/LICENSE" "$stage/LICENSE"
+    tar -czf "${stage}.tar.gz" "$stage"
+    echo "  Created ${stage}.tar.gz"
+done
 
 cd ..
 
@@ -203,11 +215,16 @@ echo "Install directory: $INSTALL_DIR"
 TMP_DIR=$(mktemp -d)
 tar -xzf "$TARBALL_PATH" -C "$TMP_DIR"
 
+# The archive expands into a versioned directory (bvbrc-cli-<ver>-linux-<arch>/)
+# containing bin/; fall back to a bare bin/ for older archives.
+BIN_SRC=$(ls -d "$TMP_DIR"/*/bin 2>/dev/null | head -1)
+[ -n "$BIN_SRC" ] || BIN_SRC="$TMP_DIR/bin"
+
 if [ -w "$INSTALL_DIR" ]; then
-    cp "$TMP_DIR/bin/"* "$INSTALL_DIR/"
+    cp "$BIN_SRC/"* "$INSTALL_DIR/"
 else
     echo "Need sudo to install to $INSTALL_DIR"
-    sudo cp "$TMP_DIR/bin/"* "$INSTALL_DIR/"
+    sudo cp "$BIN_SRC/"* "$INSTALL_DIR/"
 fi
 
 rm -rf "$TMP_DIR"

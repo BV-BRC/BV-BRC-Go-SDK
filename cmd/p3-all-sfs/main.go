@@ -115,11 +115,12 @@ func run(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// Get default fields for sf object
-	defaultFields := api.GetDefaultFields("sf")
+	// ID column for the sf object. p3-all-* are id-centric (Perl select_clause
+	// idFlag=1): the ID is always selected and emitted as the first column.
+	idColumn := api.GetIDColumn("sf")
 
 	// Build query from options
-	query, err := dataOpts.BuildQuery(defaultFields)
+	query, err := dataOpts.BuildQueryWithFields(dataOpts.SelectIDCentricFields(idColumn))
 	if err != nil {
 		return fmt.Errorf("building query: %w", err)
 	}
@@ -144,8 +145,8 @@ func run(cmd *cobra.Command, args []string) error {
 	writer := cli.NewTabWriter(outFile)
 	defer writer.Flush()
 
-	// Get the fields we're selecting
-	fields := dataOpts.GetSelectFields(defaultFields)
+	// Output columns: ID column first, then any --attr columns.
+	fields := dataOpts.SelectIDCentricFields(idColumn)
 
 	// Write header
 	if err := writer.WriteHeaders(fields); err != nil {
