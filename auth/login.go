@@ -9,6 +9,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/BV-BRC/BV-BRC-Go-SDK/version"
 )
 
 const (
@@ -35,7 +37,14 @@ func LoginPatric(username, password string) (string, error) {
 	data.Set("username", username)
 	data.Set("password", password)
 
-	resp, err := client.PostForm(PatricAuthURL, data)
+	req, err := http.NewRequest("POST", PatricAuthURL, strings.NewReader(data.Encode()))
+	if err != nil {
+		return "", fmt.Errorf("creating request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("User-Agent", version.UserAgent())
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("authentication request failed: %w", err)
 	}
@@ -73,6 +82,7 @@ func LoginRast(username, password string) (string, error) {
 	}
 
 	req.SetBasicAuth(username, password)
+	req.Header.Set("User-Agent", version.UserAgent())
 
 	resp, err := client.Do(req)
 	if err != nil {

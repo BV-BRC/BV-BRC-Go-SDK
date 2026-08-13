@@ -24,7 +24,7 @@
 
 set -e
 
-VERSION="${VERSION:-1.0.0}"
+VERSION="${VERSION:-$(sh "$(dirname "$0")/scripts/version.sh")}"
 OUTPUT_DIR="${OUTPUT_DIR:-dist}"
 APPTAINER="${APPTAINER:-apptainer}"
 APPTAINER_BUILD_ARGS="${APPTAINER_BUILD_ARGS---fakeroot}"

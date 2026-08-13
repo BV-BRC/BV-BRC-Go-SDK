@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/BV-BRC/BV-BRC-Go-SDK/auth"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/version"
 )
 
 const (
@@ -228,6 +229,7 @@ func (c *Client) call(method string, params interface{}) (json.RawMessage, error
 	}
 
 	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("User-Agent", version.UserAgent())
 	if c.Token != "" {
 		httpReq.Header.Set("Authorization", c.Token)
 	}
@@ -624,6 +626,7 @@ func (c *Client) streamFromShock(shockURL string, w io.Writer) error {
 		return fmt.Errorf("creating shock request: %w", err)
 	}
 
+	req.Header.Set("User-Agent", version.UserAgent())
 	if c.Token != "" {
 		req.Header.Set("Authorization", "OAuth "+c.Token)
 	}

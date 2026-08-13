@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/BV-BRC/BV-BRC-Go-SDK/auth"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/version"
 )
 
 const (
@@ -213,6 +214,7 @@ func (c *Client) call(method string, params ...interface{}) (json.RawMessage, er
 	}
 
 	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("User-Agent", version.UserAgent())
 	if c.Token != "" {
 		httpReq.Header.Set("Authorization", c.Token)
 	}

@@ -6,7 +6,9 @@ set -e
 # Use GO env var if set, then the local dev path if present, then PATH fallback
 GO="${GO:-/home/olson/P3/go-1.25.6/go/bin/go}"
 command -v "$GO" &>/dev/null || GO=go
-VERSION="${VERSION:-1.0.0}"
+VERSION="${VERSION:-$(sh "$(dirname "$0")/scripts/version.sh")}"
+# Stamp the version into the binaries; it is what the User-Agent reports.
+LDFLAGS_VERSION="-X github.com/BV-BRC/BV-BRC-Go-SDK/version.Version=${VERSION}"
 OUTPUT_DIR="dist"
 
 cd "$(dirname "$0")"
@@ -32,7 +34,7 @@ build_linux() {
 
     for cmd in $COMMANDS; do
         echo "  $cmd"
-        GOOS=linux GOARCH=$ARCH CGO_ENABLED=0 $GO build -buildvcs=false -ldflags="-s -w" -o "$BIN_DIR/$cmd" "./cmd/$cmd"
+        GOOS=linux GOARCH=$ARCH CGO_ENABLED=0 $GO build -buildvcs=false -ldflags="-s -w $LDFLAGS_VERSION" -o "$BIN_DIR/$cmd" "./cmd/$cmd"
     done
 }
 
