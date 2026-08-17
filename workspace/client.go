@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/BV-BRC/BV-BRC-Go-SDK/auth"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/httpdiag"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/version"
 )
 
@@ -247,6 +248,14 @@ func (c *Client) call(method string, params interface{}) (json.RawMessage, error
 
 	var rpcResp rpcResponse
 	if err := json.Unmarshal(respBody, &rpcResp); err != nil {
+		// The service answers JSON-RPC even for its own errors, so an
+		// unparseable body with a failing status came from something in front of
+		// it — a Cloudflare block page, a proxy error. Say so, rather than
+		// reporting a JSON parse error against HTML.
+		if resp.StatusCode >= 400 {
+			httpdiag.ReportIfEnabled(false, httpReq, resp, respBody)
+			return nil, fmt.Errorf("workspace request failed: %s", httpdiag.Describe(resp, respBody))
+		}
 		return nil, fmt.Errorf("parsing response: %w (body: %s)", err, string(respBody))
 	}
 
@@ -639,7 +648,8 @@ func (c *Client) streamFromShock(shockURL string, w io.Writer) error {
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("shock download failed (status %d): %s", resp.StatusCode, string(body))
+		httpdiag.ReportIfEnabled(false, req, resp, body)
+		return fmt.Errorf("shock download failed: %s", httpdiag.Describe(resp, body))
 	}
 
 	_, err = io.Copy(w, resp.Body)
