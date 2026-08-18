@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/httpdiag"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/version"
 )
 
@@ -25,11 +26,15 @@ const (
 	DefaultMaxRetries = 3
 )
 
-// DefaultUserAgent is sent on every request unless overridden: the library
-// name and build version, e.g. "bvbrc-go-sdk/2.0.12". The data API sits behind
-// Cloudflare, which bans some default library user-agents (error 1010), so a
-// request must always name us. Override via WithUserAgent or the
-// P3_USER_AGENT environment variable, which version.UserAgent honors.
+// DefaultUserAgent is the library's own name and build version, e.g.
+// "bvbrc-go-sdk/2.0.13". The data API sits behind Cloudflare, which bans some
+// default library user-agents (error 1010), so a request must always name us.
+//
+// This is only what a program that declares no product identity sends: a
+// client built by NewClient reports version.UserAgent() instead, which is
+// "bvbrc-cli-go/<version>" from the p3-* tools and honors P3_USER_AGENT. It is
+// resolved per request rather than cached here, because a product declared in
+// an init function is set after this package is initialized.
 var DefaultUserAgent = version.Name + "/" + version.Get()
 
 // Client provides access to the BV-BRC Data API.
@@ -101,10 +106,15 @@ func WithMaxRetries(retries int) ClientOption {
 	}
 }
 
-// WithDebug enables debug output.
+// WithDebug enables debug output. It also turns on HTTP diagnostics process-wide,
+// so that the Workspace and AppService calls a command makes alongside its data
+// queries dump their failures too; --debug is the one switch a user reaches for.
 func WithDebug(debug bool) ClientOption {
 	return func(c *Client) {
 		c.Debug = debug
+		if debug {
+			httpdiag.SetEnabled(true)
+		}
 	}
 }
 
@@ -256,18 +266,21 @@ func (c *Client) doQueryRequest(ctx context.Context, url, body string) ([]map[st
 			continue
 		}
 
-		// Check for server errors (retry-able)
+		// Check for server errors (retry-able). Cloudflare's own 5xx (520-527)
+		// land here, so diagnose before discarding the body.
 		if resp.StatusCode >= 500 {
+			bodyBytes, _ := io.ReadAll(resp.Body)
+			httpdiag.ReportIfEnabled(c.Debug, req, resp, bodyBytes)
 			resp.Body.Close()
-			lastErr = fmt.Errorf("server error: %s", resp.Status)
+			lastErr = fmt.Errorf("server error: %s", httpdiag.Describe(resp, bodyBytes))
 			continue
 		}
 
 		// Check for client errors (not retry-able)
 		if resp.StatusCode >= 400 {
-			bodyBytes, _ := io.ReadAll(resp.Body)
+			err := c.apiError(req, resp)
 			resp.Body.Close()
-			return nil, nil, fmt.Errorf("API error: %s - %s", resp.Status, string(bodyBytes))
+			return nil, nil, err
 		}
 
 		// Parse Content-Range header
@@ -336,8 +349,7 @@ func (c *Client) Count(ctx context.Context, objectType string, q *Query) (int, e
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return 0, fmt.Errorf("API error: %s - %s", resp.Status, string(bodyBytes))
+		return 0, c.apiError(req, resp)
 	}
 
 	chunkInfo := parseContentRange(resp.Header.Get("Content-Range"))
@@ -452,8 +464,7 @@ func (c *Client) GetByID(ctx context.Context, objectType, id string) (map[string
 	}
 
 	if resp.StatusCode >= 400 {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("API error: %s - %s", resp.Status, string(bodyBytes))
+		return nil, c.apiError(req, resp)
 	}
 
 	var result map[string]any
@@ -462,6 +473,20 @@ func (c *Client) GetByID(ctx context.Context, objectType, id string) (map[string
 	}
 
 	return result, nil
+}
+
+// apiError turns a >= 400 response into an error, naming a Cloudflare rejection
+// as such rather than reporting the block page as the service's answer. It
+// consumes the body, and dumps the whole exchange to stderr when --debug or
+// P3_DEBUG_HTTP is set.
+func (c *Client) apiError(req *http.Request, resp *http.Response) error {
+	bodyBytes, _ := io.ReadAll(resp.Body)
+	httpdiag.ReportIfEnabled(c.Debug, req, resp, bodyBytes)
+
+	if httpdiag.IsCloudflareBlock(resp, bodyBytes) {
+		return fmt.Errorf("API error: %s", httpdiag.Describe(resp, bodyBytes))
+	}
+	return fmt.Errorf("API error: %s - %s", resp.Status, string(bodyBytes))
 }
 
 // setHeaders sets common headers for API requests.
@@ -572,8 +597,7 @@ func (c *Client) GetSchema(ctx context.Context, objectType string) ([]FieldInfo,
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("API error: %s - %s", resp.Status, string(bodyBytes))
+		return nil, c.apiError(req, resp)
 	}
 
 	var schema struct {

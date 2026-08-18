@@ -10,19 +10,22 @@ import (
 	"strings"
 	"time"
 
+	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/httpdiag"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/version"
 )
 
-const (
+// Variables, not constants, so a test or a development deployment can point the
+// login at another server.
+var (
 	// PatricAuthURL is the BV-BRC authentication endpoint
 	PatricAuthURL = "https://user.patricbrc.org/authenticate"
 
 	// RastAuthURL is the RAST authentication endpoint
 	RastAuthURL = "http://rast.nmpdr.org/goauth/token?grant_type=client_credentials"
-
-	// DefaultTimeout is the HTTP client timeout for authentication requests
-	DefaultTimeout = 10 * time.Second
 )
+
+// DefaultTimeout is the HTTP client timeout for authentication requests
+const DefaultTimeout = 10 * time.Second
 
 // LoginPatric authenticates with the BV-BRC service and returns a token.
 // The username should not include the @patricbrc.org suffix.
@@ -56,7 +59,8 @@ func LoginPatric(username, password string) (string, error) {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("login failed (status %d)", resp.StatusCode)
+		httpdiag.ReportIfEnabled(false, req, resp, body)
+		return "", fmt.Errorf("login failed: %s", httpdiag.Describe(resp, body))
 	}
 
 	token := strings.TrimSpace(string(body))
@@ -90,13 +94,16 @@ func LoginRast(username, password string) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("login failed (status %d)", resp.StatusCode)
-	}
-
+	// Read the body before judging the status: on a Cloudflare rejection the body
+	// is the error page that says which rule fired.
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", fmt.Errorf("reading response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		httpdiag.ReportIfEnabled(false, req, resp, body)
+		return "", fmt.Errorf("login failed: %s", httpdiag.Describe(resp, body))
 	}
 
 	// RAST returns JSON with access_token field

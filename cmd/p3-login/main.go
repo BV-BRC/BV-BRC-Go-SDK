@@ -15,15 +15,26 @@ import (
 	"strings"
 
 	"github.com/BV-BRC/BV-BRC-Go-SDK/auth"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/httpdiag"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/version"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
 
+// This tool announces itself separately from the rest of the CLI (which uses
+// internal/cliproduct): the login path is the one where a Cloudflare rejection
+// is hardest to tell apart from a bad password, so it is worth being able to
+// pick these requests out of an access log on their own.
+func init() {
+	version.SetProduct(version.AuthProduct)
+}
+
 var (
-	logout  bool
-	status  bool
-	rast    bool
-	verbose bool
+	logout    bool
+	status    bool
+	rast      bool
+	verbose   bool
+	debugHTTP bool
 )
 
 const maxTries = 3
@@ -59,9 +70,15 @@ func init() {
 	rootCmd.Flags().BoolVarP(&status, "whoami", "s", false, "display login status")
 	rootCmd.Flags().BoolVar(&rast, "rast", false, "create a RAST login token")
 	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "display debugging info")
+	rootCmd.Flags().BoolVar(&debugHTTP, "debug-http", false,
+		"dump the HTTP headers of a failed login (same as setting P3_DEBUG_HTTP)")
 }
 
 func run(cmd *cobra.Command, args []string) error {
+	if debugHTTP {
+		httpdiag.SetEnabled(true)
+	}
+
 	tokenPath := auth.DefaultTokenPath()
 
 	if verbose {
