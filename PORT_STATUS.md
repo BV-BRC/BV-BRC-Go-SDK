@@ -315,23 +315,39 @@ a version suffix, all get **200** from `www.patricbrc.org/api` (`libwww-perl`
 still gets 403) and a plain **401** from `user.patricbrc.org/authenticate` — so
 neither new name is on the 1010 block list.
 
-### Added 2026-08-18 — `--version` on all 101 commands
+### Added 2026-08-18 — `--version` and `--debug-http` on all 101 commands
 
-Every command now takes `--version`, printing `<name> <version>` followed by the
-exact User-Agent it sends and the build platform. `p3_cli` has no equivalent, so
-this is Go-ahead-of-Perl.
+Every command now takes both flags. `p3_cli` has no `--version` equivalent, so
+that part is Go-ahead-of-Perl; `--debug-http` matches `p3-login.pl`'s.
 
-`main` calls `cliversion.Execute(rootCmd)` instead of `rootCmd.Execute()`;
-`internal/cliversion` is a leaf package (cobra + `version` only) so the three
-offline commands do not link the API client to report a version.
-`TestEveryCommandSupportsVersion` mirrors `TestEveryCommandDeclaresAProduct` and
-fails if a new command calls `rootCmd.Execute()` directly.
+`main` calls `cliroot.Execute(rootCmd)` instead of `rootCmd.Execute()`.
+`internal/cliroot` is a leaf package (cobra, `version` and `httpdiag`, none of
+which reach beyond the standard library) so the three offline commands —
+`p3-echo`, `p3-fasta-md5`, `p3-merge` — do not link the API client to report a
+version. `TestEveryCommandUsesTheSharedRoot` mirrors
+`TestEveryCommandDeclaresAProduct` and fails if a new command calls
+`rootCmd.Execute()` directly, which would build and run but silently lack both
+flags.
 
-The flag is registered explicitly rather than through cobra's
-`InitDefaultVersionFlag`, which claims `-v` whenever that shorthand is free:
-eight commands bind `-v` themselves (`--verbose`, and `--reverse` in three), so
-the default would have made `-v` mean "version" in 93 tools and something else
-in the other 8.
+`--version` prints `<name> <version>` followed by the exact User-Agent the
+binary sends and the build platform. It is registered explicitly rather than
+through cobra's `InitDefaultVersionFlag`, which claims `-v` whenever that
+shorthand is free: eight commands bind `-v` themselves (`--verbose`, and
+`--reverse` in three), so the default would have made `-v` mean "version" in 93
+tools and something else in the other 8. The User-Agent line reaches the output
+through `Command.Annotations`, not the template text, so a `{{…}}` inside
+`P3_USER_AGENT` prints verbatim instead of being parsed as a template action.
+
+`--debug-http` is the flag form of `P3_DEBUG_HTTP`, which stays the documented
+switch because it needs no plumbing. Before this only the 40 commands carrying
+`DataOptions` had any flag for it (`--debug`), leaving every `p3-submit-*`,
+`p3-ls`, `p3-cp` and `p3-job-status` — the ones that talk to Workspace and
+AppService, and the login path — with no way to ask for a dump. It is a
+`pflag.Value` that calls `httpdiag.SetEnabled(true)` from `Set`, i.e. during
+parsing: reading a bool later would mean hooking `PersistentPreRun` (which
+commands define for themselves) or `cobra.OnInitialize` (global state that
+accumulates). `p3-login`'s own `--debug-http` was removed in favour of this one
+so there is a single definition.
 
 ### Remaining ERROR class
 

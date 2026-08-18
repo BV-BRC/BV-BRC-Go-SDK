@@ -1,4 +1,4 @@
-package cliversion_test
+package cliroot_test
 
 import (
 	"bytes"
@@ -11,7 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliversion"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliroot"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/httpdiag"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/version"
 	"github.com/spf13/cobra"
 )
@@ -40,7 +41,7 @@ func runVersion(t *testing.T, cmd *cobra.Command) string {
 
 func TestVersionOutput(t *testing.T) {
 	cmd := newCmd()
-	cliversion.Register(cmd)
+	cliroot.Register(cmd)
 
 	got := runVersion(t, cmd)
 	lines := strings.Split(strings.TrimRight(got, "\n"), "\n")
@@ -64,7 +65,7 @@ func TestRegisterDoesNotClaimTheVShorthand(t *testing.T) {
 	// is free. Most of the suite leaves it free, but eight commands bind -v to
 	// --verbose or --reverse, so -v must not mean "version" anywhere.
 	cmd := newCmd()
-	cliversion.Register(cmd)
+	cliroot.Register(cmd)
 	if err := cmd.Execute(); err != nil { // triggers cobra's flag initialization
 		t.Fatalf("executing: %v", err)
 	}
@@ -81,7 +82,7 @@ func TestRegisterLeavesAnExistingVShorthandAlone(t *testing.T) {
 	cmd := newCmd()
 	var reverse bool
 	cmd.Flags().BoolVarP(&reverse, "reverse", "v", false, "output non-matching rows instead")
-	cliversion.Register(cmd)
+	cliroot.Register(cmd)
 
 	cmd.SetArgs([]string{"-v"})
 	var out bytes.Buffer
@@ -105,12 +106,101 @@ func TestUserAgentIsNotTreatedAsATemplate(t *testing.T) {
 	t.Setenv("P3_USER_AGENT", "weird/{{.Name}}")
 
 	cmd := newCmd()
-	cliversion.Register(cmd)
+	cliroot.Register(cmd)
 	got := runVersion(t, cmd)
 
 	if !strings.Contains(got, "weird/{{.Name}}") {
 		t.Errorf("--version output = %q, want it to contain the user-agent verbatim", got)
 	}
+}
+
+// withDiagnosticsOff runs the body with HTTP diagnostics known to be off and
+// restores whatever they were. The switch is process-wide, so a test that flips
+// it would otherwise leak into the ones that follow.
+func withDiagnosticsOff(t *testing.T, body func()) {
+	t.Helper()
+	was := httpdiag.Enabled()
+	httpdiag.SetEnabled(false)
+	defer httpdiag.SetEnabled(was)
+	body()
+}
+
+// runArgs executes cmd with the given arguments, discarding its output.
+func runArgs(t *testing.T, cmd *cobra.Command, args ...string) {
+	t.Helper()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs(args)
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("executing with %v: %v (output: %s)", args, err, out.String())
+	}
+}
+
+func TestDebugHTTPEnablesDiagnostics(t *testing.T) {
+	withDiagnosticsOff(t, func() {
+		cmd := newCmd()
+		cliroot.Register(cmd)
+		// Bare, with no "=true": the flag is a boolean and must not demand an
+		// argument, or it would swallow the next word on the command line.
+		runArgs(t, cmd, "--debug-http")
+
+		if !httpdiag.Enabled() {
+			t.Error("--debug-http did not turn HTTP diagnostics on")
+		}
+	})
+}
+
+func TestDebugHTTPFalseLeavesDiagnosticsOff(t *testing.T) {
+	withDiagnosticsOff(t, func() {
+		cmd := newCmd()
+		cliroot.Register(cmd)
+		runArgs(t, cmd, "--debug-http=false")
+
+		if httpdiag.Enabled() {
+			t.Error("--debug-http=false turned HTTP diagnostics on")
+		}
+	})
+}
+
+func TestDebugHTTPAbsentLeavesDiagnosticsOff(t *testing.T) {
+	withDiagnosticsOff(t, func() {
+		cmd := newCmd()
+		cliroot.Register(cmd)
+		runArgs(t, cmd)
+
+		if httpdiag.Enabled() {
+			t.Error("HTTP diagnostics came on without the flag")
+		}
+	})
+}
+
+func TestDebugHTTPClaimsNoShorthand(t *testing.T) {
+	// -d is bound to --delimiter and to --dry-run elsewhere in the suite.
+	cmd := newCmd()
+	cliroot.Register(cmd)
+	if f := cmd.Flags().ShorthandLookup("d"); f != nil {
+		t.Errorf("-d is bound to %q; --debug-http must not claim a shorthand", f.Name)
+	}
+}
+
+func TestRegisterLeavesAnExistingDebugHTTPFlagAlone(t *testing.T) {
+	// Registering a duplicate flag name panics in pflag, so a command that
+	// declares its own must keep it.
+	withDiagnosticsOff(t, func() {
+		cmd := newCmd()
+		var own bool
+		cmd.Flags().BoolVar(&own, "debug-http", false, "the command's own wording")
+		cliroot.Register(cmd)
+		runArgs(t, cmd, "--debug-http")
+
+		if !own {
+			t.Error("--debug-http did not set the command's own variable")
+		}
+		if f := cmd.Flags().Lookup("debug-http"); f.Usage != "the command's own wording" {
+			t.Errorf("usage = %q, want the command's own wording", f.Usage)
+		}
+	})
 }
 
 func TestExecuteRegistersTheFlag(t *testing.T) {
@@ -120,7 +210,7 @@ func TestExecuteRegistersTheFlag(t *testing.T) {
 	cmd.SetErr(&out)
 	cmd.SetArgs([]string{"--version"})
 
-	if err := cliversion.Execute(cmd); err != nil {
+	if err := cliroot.Execute(cmd); err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
 	if !strings.HasPrefix(out.String(), "p3-thing ") {
@@ -128,13 +218,13 @@ func TestExecuteRegistersTheFlag(t *testing.T) {
 	}
 }
 
-// TestEveryCommandSupportsVersion is the counterpart of
+// TestEveryCommandUsesTheSharedRoot is the counterpart of
 // TestEveryCommandDeclaresAProduct in internal/cliproduct: a command that calls
-// rootCmd.Execute() directly still builds and still works, it just silently has
-// no --version flag. Only a test catches that.
-func TestEveryCommandSupportsVersion(t *testing.T) {
+// rootCmd.Execute() directly still builds and still works, it just silently
+// lacks --version and --debug-http. Only a test catches that.
+func TestEveryCommandUsesTheSharedRoot(t *testing.T) {
 	const (
-		pkg     = "github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliversion"
+		pkg     = "github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliroot"
 		cmdRoot = "../../cmd"
 	)
 
@@ -152,10 +242,10 @@ func TestEveryCommandSupportsVersion(t *testing.T) {
 		imports, callsHelper, callsExecuteDirectly := scanCommand(t, filepath.Join(cmdRoot, cmd))
 
 		if !imports[pkg] || !callsHelper {
-			t.Errorf("%s: main must call cliversion.Execute(rootCmd) so the command has a --version flag", cmd)
+			t.Errorf("%s: main must call cliroot.Execute(rootCmd) so the command has the shared --version and --debug-http flags", cmd)
 		}
 		if callsExecuteDirectly {
-			t.Errorf("%s: calls rootCmd.Execute() directly, bypassing the --version flag", cmd)
+			t.Errorf("%s: calls rootCmd.Execute() directly, bypassing the shared flags", cmd)
 		}
 		checked++
 	}
@@ -166,7 +256,7 @@ func TestEveryCommandSupportsVersion(t *testing.T) {
 }
 
 // scanCommand returns the packages the command imports, whether it calls
-// cliversion.Execute or cliversion.Register, and whether it still calls
+// cliroot.Execute or cliroot.Register, and whether it still calls
 // rootCmd.Execute directly.
 func scanCommand(t *testing.T, dir string) (imports map[string]bool, callsHelper, callsExecuteDirectly bool) {
 	t.Helper()
@@ -197,7 +287,7 @@ func scanCommand(t *testing.T, dir string) (imports map[string]bool, callsHelper
 					return true
 				}
 				switch {
-				case ident.Name == "cliversion" && (sel.Sel.Name == "Execute" || sel.Sel.Name == "Register"):
+				case ident.Name == "cliroot" && (sel.Sel.Name == "Execute" || sel.Sel.Name == "Register"):
 					callsHelper = true
 				case ident.Name == "rootCmd" && sel.Sel.Name == "Execute":
 					callsExecuteDirectly = true

@@ -20,7 +20,7 @@ import (
 
 	"github.com/BV-BRC/BV-BRC-Go-SDK/auth"
 	_ "github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliproduct"
-	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliversion"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliroot"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/workspace"
 	"github.com/spf13/cobra"
 )
@@ -97,7 +97,7 @@ func run(cmd *cobra.Command, args []string) error {
 }
 
 func main() {
-	if err := cliversion.Execute(rootCmd); err != nil {
+	if err := cliroot.Execute(rootCmd); err != nil {
 		os.Exit(1)
 	}
 }
