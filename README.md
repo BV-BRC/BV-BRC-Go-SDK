@@ -319,6 +319,9 @@ Build scripts produce packages in `dist/`:
 
 Full SHA256 checksums: `bvbrc-cli-VERSION-checksums.sha256`
 
+Published packages are built by CI from a `v*` tag pushed to this repository —
+see [RELEASING.md](RELEASING.md).
+
 ## Project Structure
 
 ```
