@@ -31,6 +31,7 @@ import (
 	"strings"
 
 	"github.com/BV-BRC/BV-BRC-Go-SDK/auth"
+	_ "github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliproduct"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/workspace"
 	"github.com/spf13/cobra"
 )

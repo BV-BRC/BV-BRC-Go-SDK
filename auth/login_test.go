@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/BV-BRC/BV-BRC-Go-SDK/version"
 )
 
 const cfBlockPage = `<!DOCTYPE html><html><head><title>Access denied</title></head>
@@ -66,8 +68,11 @@ func TestLoginPatricBadPassword(t *testing.T) {
 
 func TestLoginPatricSuccess(t *testing.T) {
 	withAuthURL(t, &PatricAuthURL, func(w http.ResponseWriter, r *http.Request) {
-		if got := r.Header.Get("User-Agent"); !strings.HasPrefix(got, "bvbrc-go-sdk/") {
-			t.Errorf("User-Agent = %q, want the SDK's", got)
+		// Whatever the program declared itself to be -- "bvbrc-auth-go/…"
+		// from p3-login, the library's own name from a test binary -- never
+		// Go's default, which Cloudflare may reject.
+		if got, want := r.Header.Get("User-Agent"), version.UserAgent(); got != want {
+			t.Errorf("User-Agent = %q, want %q", got, want)
 		}
 		io.WriteString(w, "un=someone@patricbrc.org|tokenid=x|sig=y")
 	})

@@ -16,9 +16,18 @@ import (
 
 	"github.com/BV-BRC/BV-BRC-Go-SDK/auth"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/httpdiag"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/version"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
+
+// This tool announces itself separately from the rest of the CLI (which uses
+// internal/cliproduct): the login path is the one where a Cloudflare rejection
+// is hardest to tell apart from a bad password, so it is worth being able to
+// pick these requests out of an access log on their own.
+func init() {
+	version.SetProduct(version.AuthProduct)
+}
 
 var (
 	logout    bool

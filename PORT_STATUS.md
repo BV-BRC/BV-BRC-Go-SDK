@@ -193,7 +193,7 @@ MISMATCH=0 means Go and Perl emit identical params on every fixture where both s
 
 | Issue | Fix |
 |---|---|
-| Perl data-API stall (Cloudflare 1010 on `patricbrc.org`) | Switched `P3DataAPI` to `bv-brc.org`; added a configurable UA (Perl sends `BV-BRC P3 Client`, Go now sends `bvbrc-go-sdk/<version>`) |
+| Perl data-API stall (Cloudflare 1010 on `patricbrc.org`) | Switched `P3DataAPI` to `bv-brc.org`; added a configurable UA (Perl sends `bvbrc-cli-perl`, Go sends `bvbrc-cli-go/<version>`) |
 | Go rejected `Snippy` mapper/caller (variation) | Added to `validMappers`/`validCallers` |
 | Go virus-type codes used underscore (`MASTADENO_A`) | Corrected to match Perl (`MASTADENOA` etc.) |
 | `progressiveMauve` rejected by both CLIs | Added to Perl `ALIGNER` constant and Go `validAligners` |
@@ -285,6 +285,35 @@ tagged, otherwise the short commit hash — and the `Makefile` and the four
 
 Perl is unaffected: `P3DataAPI` keeps sending `BV-BRC P3 Client`. The suite does
 not look at headers, so this changes no result.
+
+### Added 2026-08-18 — the CLI names itself, not the library
+
+The User-Agent now names the **product**, not the SDK: `bvbrc-cli-go/<version>`
+from the `p3-*` tools and `bvbrc-auth-go/<version>` from `p3-login`. Only a
+program that links these packages as a library still reports `bvbrc-go-sdk`.
+That is the point of the split — CLI traffic, a login attempt, and a
+third-party integration are now three distinguishable things in an access log
+or a Cloudflare block report. Mirrors the Perl side's `bvbrc-cli-perl` /
+`bvbrc-auth-perl`.
+
+Unlike the version, the product is knowable from the source, so it is declared
+there rather than stamped by the build: 97 commands blank-import
+`internal/cliproduct` (whose `init` calls `version.SetProduct`), and
+`cmd/p3-login` calls `version.SetProduct(version.AuthProduct)` directly.
+`go install …/cmd/p3-ls@v2` therefore identifies itself correctly even though
+it carries no build flags. `p3-echo`, `p3-fasta-md5` and `p3-merge` make no
+requests and declare nothing; `TestEveryCommandDeclaresAProduct` fails if a new
+command forgets, or if one of those three grows a service call.
+
+`P3_USER_AGENT`, `WithUserAgent` and `--user-agent` still override, in that
+order of precedence over the product. Perl's `P3_CLIENT_PRODUCT` is
+deliberately **not** read here: a Perl `p3-*` wrapper exports it, and a Go tool
+it shells out to must not inherit `bvbrc-cli-perl`.
+
+Verified live 2026-08-18: `bvbrc-cli-go` and `bvbrc-auth-go`, with and without
+a version suffix, all get **200** from `www.patricbrc.org/api` (`libwww-perl`
+still gets 403) and a plain **401** from `user.patricbrc.org/authenticate` — so
+neither new name is on the 1010 block list.
 
 ### Remaining ERROR class
 

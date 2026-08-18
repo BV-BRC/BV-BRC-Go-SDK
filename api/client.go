@@ -26,11 +26,15 @@ const (
 	DefaultMaxRetries = 3
 )
 
-// DefaultUserAgent is sent on every request unless overridden: the library
-// name and build version, e.g. "bvbrc-go-sdk/2.0.12". The data API sits behind
-// Cloudflare, which bans some default library user-agents (error 1010), so a
-// request must always name us. Override via WithUserAgent or the
-// P3_USER_AGENT environment variable, which version.UserAgent honors.
+// DefaultUserAgent is the library's own name and build version, e.g.
+// "bvbrc-go-sdk/2.0.13". The data API sits behind Cloudflare, which bans some
+// default library user-agents (error 1010), so a request must always name us.
+//
+// This is only what a program that declares no product identity sends: a
+// client built by NewClient reports version.UserAgent() instead, which is
+// "bvbrc-cli-go/<version>" from the p3-* tools and honors P3_USER_AGENT. It is
+// resolved per request rather than cached here, because a product declared in
+// an init function is set after this package is initialized.
 var DefaultUserAgent = version.Name + "/" + version.Get()
 
 // Client provides access to the BV-BRC Data API.

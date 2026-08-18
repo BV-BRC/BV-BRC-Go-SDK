@@ -19,6 +19,7 @@ import (
 	"strings"
 
 	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cli"
+	_ "github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliproduct"
 	"github.com/spf13/cobra"
 )
 
