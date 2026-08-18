@@ -23,33 +23,59 @@ import (
 
 ## Installation
 
+Current release: **2.0.14**. Substitute another version below to install it;
+the archives are attached to each
+[GitHub release](https://github.com/BV-BRC/BV-BRC-Go-SDK/releases).
+
+### conda (all platforms)
+
+```bash
+conda install -c bv-brc bvbrc-cli
+```
+
+Packages are published for linux-64, linux-aarch64, osx-64 and osx-arm64.
+
 ### Linux
+
+Each archive expands into a versioned directory containing `bin/` — not a bare
+`bin/`.
 
 ```bash
 # x86_64
-curl -LO https://github.com/BV-BRC/BV-BRC-Go-SDK/releases/download/v1.0.0/bvbrc-cli-1.0.0-linux-amd64.tar.gz
-tar -xzf bvbrc-cli-1.0.0-linux-amd64.tar.gz
-sudo cp bin/p3-* /usr/local/bin/
+curl -LO https://github.com/BV-BRC/BV-BRC-Go-SDK/releases/download/v2.0.14/bvbrc-cli-2.0.14-linux-amd64.tar.gz
+tar -xzf bvbrc-cli-2.0.14-linux-amd64.tar.gz
+sudo cp bvbrc-cli-2.0.14-linux-amd64/bin/p3-* /usr/local/bin/
 
 # ARM64 (e.g. Raspberry Pi, AWS Graviton)
-curl -LO https://github.com/BV-BRC/BV-BRC-Go-SDK/releases/download/v1.0.0/bvbrc-cli-1.0.0-linux-arm64.tar.gz
-tar -xzf bvbrc-cli-1.0.0-linux-arm64.tar.gz
-sudo cp bin/p3-* /usr/local/bin/
+curl -LO https://github.com/BV-BRC/BV-BRC-Go-SDK/releases/download/v2.0.14/bvbrc-cli-2.0.14-linux-arm64.tar.gz
+tar -xzf bvbrc-cli-2.0.14-linux-arm64.tar.gz
+sudo cp bvbrc-cli-2.0.14-linux-arm64/bin/p3-* /usr/local/bin/
+```
+
+A `.deb` is also published for each architecture, and installs into
+`/usr/local/bin`:
+
+```bash
+curl -LO https://github.com/BV-BRC/BV-BRC-Go-SDK/releases/download/v2.0.14/bvbrc-cli_2.0.14_amd64.deb
+sudo dpkg -i bvbrc-cli_2.0.14_amd64.deb
 ```
 
 ### macOS
 
 ```bash
 # Apple Silicon
-curl -LO https://github.com/BV-BRC/BV-BRC-Go-SDK/releases/download/v1.0.0/bvbrc-cli-1.0.0-darwin-arm64.tar.gz
-tar -xzf bvbrc-cli-1.0.0-darwin-arm64.tar.gz
-sudo cp bin/p3-* /usr/local/bin/
+curl -LO https://github.com/BV-BRC/BV-BRC-Go-SDK/releases/download/v2.0.14/bvbrc-cli-2.0.14-darwin-arm64.tar.gz
+tar -xzf bvbrc-cli-2.0.14-darwin-arm64.tar.gz
+sudo cp bvbrc-cli-2.0.14-darwin-arm64/bin/p3-* /usr/local/bin/
 
 # Intel
-curl -LO https://github.com/BV-BRC/BV-BRC-Go-SDK/releases/download/v1.0.0/bvbrc-cli-1.0.0-darwin-amd64.tar.gz
-tar -xzf bvbrc-cli-1.0.0-darwin-amd64.tar.gz
-sudo cp bin/p3-* /usr/local/bin/
+curl -LO https://github.com/BV-BRC/BV-BRC-Go-SDK/releases/download/v2.0.14/bvbrc-cli-2.0.14-darwin-amd64.tar.gz
+tar -xzf bvbrc-cli-2.0.14-darwin-amd64.tar.gz
+sudo cp bvbrc-cli-2.0.14-darwin-amd64/bin/p3-* /usr/local/bin/
 ```
+
+A `darwin-universal` tarball containing fat binaries for both architectures is
+also published, if you would rather ship one build to mixed hardware.
 
 > **macOS note:** binaries are not yet code-signed. If Gatekeeper blocks them,
 > run `xattr -dr com.apple.quarantine /usr/local/bin/p3-*` after copying, or
@@ -60,14 +86,16 @@ sudo cp bin/p3-* /usr/local/bin/
 
 ```powershell
 # x64 (most PCs)
-# Download bvbrc-cli-1.0.0-windows-amd64.zip from the releases page, then:
-Expand-Archive bvbrc-cli-1.0.0-windows-amd64.zip .
-# Copy the .exe files to a directory on your PATH, e.g.:
-Copy-Item windows-amd64\p3-*.exe C:\Windows\System32\
+# Download bvbrc-cli-2.0.14-windows-amd64.zip from the releases page, then:
+Expand-Archive bvbrc-cli-2.0.14-windows-amd64.zip .
+# The .exe files sit at the top of the extracted directory (no bin\ on Windows).
+# Copy them to a directory on your PATH, e.g.:
+Copy-Item bvbrc-cli-2.0.14-windows-amd64\p3-*.exe C:\Windows\System32\
 p3-login
 ```
 
-Or run the included install script as Administrator:
+Or run one of the included installers from the extracted directory, as
+Administrator:
 ```powershell
 powershell -ExecutionPolicy Bypass -File install.ps1
 ```
@@ -76,13 +104,33 @@ powershell -ExecutionPolicy Bypass -File install.ps1
 
 ```bash
 # Linux / macOS: verify checksums
-curl -LO https://github.com/BV-BRC/BV-BRC-Go-SDK/releases/download/v1.0.0/bvbrc-cli-1.0.0-checksums.sha256
-sha256sum -c bvbrc-cli-1.0.0-checksums.sha256
+curl -LO https://github.com/BV-BRC/BV-BRC-Go-SDK/releases/download/v2.0.14/bvbrc-cli-2.0.14-checksums.sha256
+sha256sum -c bvbrc-cli-2.0.14-checksums.sha256
 ```
 
 ```powershell
 # Windows: verify checksum of a single file
-Get-FileHash bvbrc-cli-1.0.0-windows-amd64.zip -Algorithm SHA256
+Get-FileHash bvbrc-cli-2.0.14-windows-amd64.zip -Algorithm SHA256
+```
+
+Every command takes `--version`:
+
+```bash
+$ p3-ls --version
+p3-ls 2.0.14
+bvbrc-cli-go/2.0.14 linux/amd64 go1.25.6
+```
+
+The second line is the exact `User-Agent` that binary sends, so it also reports
+the product identity (`bvbrc-auth-go` from `p3-login`) and any `P3_USER_AGENT`
+override — quote it when reporting a request that was rejected at the edge.
+
+A binary built with a plain `go build` is not stamped and reports `unknown`
+for its version; use `make` or a build script. To read the stamp without
+running the binary:
+
+```bash
+go version -m $(which p3-ls) | grep ldflags   # -X .../version.Version=2.0.14
 ```
 
 ## Getting Started
@@ -280,17 +328,25 @@ export PATH=/home/olson/P3/go-1.25.6/go/bin:$PATH
 go build -buildvcs=false ./...      # verify everything compiles
 make                                 # build to bin/
 
-# Release builds (static, stripped)
-VERSION=1.0.0 ./build-linux.sh       # Linux amd64 + arm64 + .deb
-VERSION=1.0.0 ./build-macos.sh       # macOS Intel + Apple Silicon tarballs
-VERSION=1.0.0 ./build-windows.sh     # Windows x64 + ARM64
+# Release builds (static, stripped, version stamped into the binaries)
+VERSION=2.0.14 ./build-linux.sh      # Linux amd64 + arm64 + .deb
+VERSION=2.0.14 ./build-macos.sh      # macOS Intel + Apple Silicon + universal
+VERSION=2.0.14 ./build-windows.sh    # Windows x64 + ARM64
 
 # Single command
 go build -buildvcs=false -o bin/p3-all-genomes ./cmd/p3-all-genomes
 ```
 
 > **Note:** use `-buildvcs=false` — the git+svn mix in the dev_container tree
-> breaks VCS stamping otherwise.
+> breaks VCS stamping otherwise. A plain `go build` stamps no version at all;
+> use `make` or a build script when the reported version matters.
+
+> **Note:** `build-macos.sh` clears all of `dist/`, while the other two clean
+> only their own subdirectories — so run them in the order shown above, or
+> build each platform into a separate `OUTPUT_DIR`.
+
+Released artifacts are built by CI from a tag rather than by hand; see
+[RELEASING.md](RELEASING.md).
 
 ### Running Tests
 
@@ -306,18 +362,29 @@ BVBRC_TEST_INTEGRATION=1 go test -v -run TestSmoke ./...
 
 Build scripts produce packages in `dist/`:
 
-| Platform | Package | v1.0.0 SHA256 (first 16 chars) |
-|----------|---------|-------------------------------|
-| Linux x86_64 | `bvbrc-cli-VERSION-linux-amd64.tar.gz` | `5fd4d779ef72bb9a` |
-| Linux ARM64 | `bvbrc-cli-VERSION-linux-arm64.tar.gz` | `adce7b4deb8b2553` |
-| Linux x86_64 (Debian) | `bvbrc-cli_VERSION_amd64.deb` | — |
-| Linux ARM64 (Debian) | `bvbrc-cli_VERSION_arm64.deb` | — |
-| macOS Intel | `bvbrc-cli-VERSION-darwin-amd64.tar.gz` | `b268bae5ea1320a8` |
-| macOS Apple Silicon | `bvbrc-cli-VERSION-darwin-arm64.tar.gz` | `2ea3165d25e0fceb` |
-| Windows x64 | `bvbrc-cli-VERSION-windows-amd64.zip` | `d95f5cfd8936493f` |
-| Windows ARM64 | `bvbrc-cli-VERSION-windows-arm64.zip` | `a24020ae8b2975c1` |
+| Platform | Package | Layout |
+|----------|---------|--------|
+| Linux x86_64 | `bvbrc-cli-VERSION-linux-amd64.tar.gz` | `<dir>/bin/p3-*` |
+| Linux ARM64 | `bvbrc-cli-VERSION-linux-arm64.tar.gz` | `<dir>/bin/p3-*` |
+| Linux x86_64 (Debian) | `bvbrc-cli_VERSION_amd64.deb` | `/usr/local/bin` |
+| Linux ARM64 (Debian) | `bvbrc-cli_VERSION_arm64.deb` | `/usr/local/bin` |
+| macOS Intel | `bvbrc-cli-VERSION-darwin-amd64.tar.gz` | `<dir>/bin/p3-*` |
+| macOS Apple Silicon | `bvbrc-cli-VERSION-darwin-arm64.tar.gz` | `<dir>/bin/p3-*` |
+| macOS universal | `bvbrc-cli-VERSION-darwin-universal.tar.gz` | `<dir>/bin/p3-*` |
+| Windows x64 | `bvbrc-cli-VERSION-windows-amd64.zip` | `<dir>\p3-*.exe` |
+| Windows ARM64 | `bvbrc-cli-VERSION-windows-arm64.zip` | `<dir>\p3-*.exe` |
 
-Full SHA256 checksums: `bvbrc-cli-VERSION-checksums.sha256`
+`<dir>` is `bvbrc-cli-VERSION-<platform>`; every archive expands into one, and
+each also carries a generated `README` and the `LICENSE`.
+
+The GitHub release additionally attaches `bvbrc-cli-VERSION-checksums.sha256`
+covering all of the above, and Apptainer/Singularity images
+(`bvbrc-cli-VERSION-<distro>-amd64.sif` for ubuntu-22, ubuntu-24 and rocky-9)
+with the tools preinstalled in `/usr/local/bin`:
+
+```bash
+apptainer exec bvbrc-cli-2.0.14-ubuntu-24-amd64.sif p3-all-genomes --limit 1
+```
 
 Published packages are built by CI from a `v*` tag pushed to this repository —
 see [RELEASING.md](RELEASING.md).
