@@ -17,6 +17,7 @@ import (
 	"github.com/BV-BRC/BV-BRC-Go-SDK/appservice"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/auth"
 	_ "github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliproduct"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliversion"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/workspace"
 	"github.com/spf13/cobra"
 )
@@ -28,9 +29,9 @@ var (
 	dryRun             bool
 
 	// Query options
-	inType       string
-	inIDList     string
-	inFastaFile  string
+	inType      string
+	inIDList    string
+	inFastaFile string
 
 	// Database options
 	dbType       string
@@ -222,14 +223,14 @@ func run(cmd *cobra.Command, args []string) error {
 
 	// Build parameters
 	params := map[string]interface{}{
-		"input_type":           inType,
-		"db_type":              dbType,
-		"blast_program":        blastProgram,
-		"blast_evalue_cutoff":  evalueCutoff,
-		"blast_max_hits":       maxHits,
-		"blast_min_coverage":   minCoverage,
-		"output_path":          outputPath,
-		"output_file":          outputName,
+		"input_type":          inType,
+		"db_type":             dbType,
+		"blast_program":       blastProgram,
+		"blast_evalue_cutoff": evalueCutoff,
+		"blast_max_hits":      maxHits,
+		"blast_min_coverage":  minCoverage,
+		"output_path":         outputPath,
+		"output_file":         outputName,
 	}
 
 	// Process input source
@@ -391,7 +392,7 @@ func parseGenomeList(input string) ([]string, error) {
 }
 
 func main() {
-	if err := rootCmd.Execute(); err != nil {
+	if err := cliversion.Execute(rootCmd); err != nil {
 		os.Exit(1)
 	}
 }

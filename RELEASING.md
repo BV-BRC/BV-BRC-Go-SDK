@@ -102,12 +102,14 @@ go unnoticed:
 
 ```bash
 tar xzf bvbrc-cli-2.0.14-linux-amd64.tar.gz
-./bvbrc-cli-2.0.14-linux-amd64/bin/p3-login --help >/dev/null   # or:
-go version -m ./bvbrc-cli-2.0.14-linux-amd64/bin/p3-ls | grep ldflags
+./bvbrc-cli-2.0.14-linux-amd64/bin/p3-ls --version   # must print 2.0.14, not "unknown"
+#   p3-ls 2.0.14
+#   bvbrc-cli-go/2.0.14 linux/amd64 go1.25.6
+go version -m ./bvbrc-cli-2.0.14-linux-amd64/bin/p3-ls | grep ldflags   # same, without running it
 ```
 
-An unstamped binary reports its User-Agent as `bvbrc-cli-go/unknown` — right
-product, no version. And the conda side:
+An unstamped binary reports `p3-ls unknown` and a User-Agent of
+`bvbrc-cli-go/unknown` — right product, no version. And the conda side:
 
 ```bash
 curl -s https://api.anaconda.org/package/bv-brc/bvbrc-cli | jq .latest_version

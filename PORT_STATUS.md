@@ -315,6 +315,24 @@ a version suffix, all get **200** from `www.patricbrc.org/api` (`libwww-perl`
 still gets 403) and a plain **401** from `user.patricbrc.org/authenticate` — so
 neither new name is on the 1010 block list.
 
+### Added 2026-08-18 — `--version` on all 101 commands
+
+Every command now takes `--version`, printing `<name> <version>` followed by the
+exact User-Agent it sends and the build platform. `p3_cli` has no equivalent, so
+this is Go-ahead-of-Perl.
+
+`main` calls `cliversion.Execute(rootCmd)` instead of `rootCmd.Execute()`;
+`internal/cliversion` is a leaf package (cobra + `version` only) so the three
+offline commands do not link the API client to report a version.
+`TestEveryCommandSupportsVersion` mirrors `TestEveryCommandDeclaresAProduct` and
+fails if a new command calls `rootCmd.Execute()` directly.
+
+The flag is registered explicitly rather than through cobra's
+`InitDefaultVersionFlag`, which claims `-v` whenever that shorthand is free:
+eight commands bind `-v` themselves (`--verbose`, and `--reverse` in three), so
+the default would have made `-v` mean "version" in 93 tools and something else
+in the other 8.
+
 ### Remaining ERROR class
 
 All 49 remaining ERRORs are **environmental, not CLI bugs**. They fall into three categories:

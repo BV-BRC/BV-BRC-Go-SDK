@@ -17,6 +17,7 @@ import (
 
 	"github.com/BV-BRC/BV-BRC-Go-SDK/auth"
 	_ "github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliproduct"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliversion"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/workspace"
 	"github.com/spf13/cobra"
 )
@@ -238,7 +239,7 @@ func localCopy(src, dest string) error {
 }
 
 func main() {
-	if err := rootCmd.Execute(); err != nil {
+	if err := cliversion.Execute(rootCmd); err != nil {
 		os.Exit(1)
 	}
 }

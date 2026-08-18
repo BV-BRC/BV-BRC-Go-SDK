@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/BV-BRC/BV-BRC-Go-SDK/auth"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliversion"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/httpdiag"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/version"
 	"github.com/spf13/cobra"
@@ -200,7 +201,7 @@ func getPassword() (string, error) {
 }
 
 func main() {
-	if err := rootCmd.Execute(); err != nil {
+	if err := cliversion.Execute(rootCmd); err != nil {
 		os.Exit(1)
 	}
 }

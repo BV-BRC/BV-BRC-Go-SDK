@@ -47,6 +47,7 @@ import (
 	"github.com/BV-BRC/BV-BRC-Go-SDK/auth"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cli"
 	_ "github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliproduct"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliversion"
 	"github.com/spf13/cobra"
 )
 
@@ -62,17 +63,17 @@ const (
 
 // validKeys maps each allowed key field to its query strategy.
 var validKeys = map[string]keyType{
-	"genome_name":         keyBatch,
-	"genbank_accessions":  keyBatch,
-	"assembly_accession":  keyBatch,
-	"sra_accession":       keyBatch,
-	"genus":               keyPerVal,
-	"species":             keyPerVal,
-	"taxon_id":            keyPerVal,
-	"family":              keyPerVal,
-	"order":               keyPerVal,
-	"class":               keyPerVal,
-	"phylum":              keyPerVal,
+	"genome_name":        keyBatch,
+	"genbank_accessions": keyBatch,
+	"assembly_accession": keyBatch,
+	"sra_accession":      keyBatch,
+	"genus":              keyPerVal,
+	"species":            keyPerVal,
+	"taxon_id":           keyPerVal,
+	"family":             keyPerVal,
+	"order":              keyPerVal,
+	"class":              keyPerVal,
+	"phylum":             keyPerVal,
 }
 
 var (
@@ -372,7 +373,7 @@ func run(cmd *cobra.Command, args []string) error {
 }
 
 func main() {
-	if err := rootCmd.Execute(); err != nil {
+	if err := cliversion.Execute(rootCmd); err != nil {
 		os.Exit(1)
 	}
 }

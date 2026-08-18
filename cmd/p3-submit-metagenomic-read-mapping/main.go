@@ -14,10 +14,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cli"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/appservice"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/auth"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cli"
 	_ "github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliproduct"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliversion"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/workspace"
 	"github.com/spf13/cobra"
 )
@@ -119,11 +120,11 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	params := map[string]interface{}{
-		"gene_set_type":  "predefined_list",
-		"gene_set_fasta": "",
-		"gene_set_name":  geneSetName,
-		"output_path":    outputPath,
-		"output_file":    outputName,
+		"gene_set_type":   "predefined_list",
+		"gene_set_fasta":  "",
+		"gene_set_name":   geneSetName,
+		"output_path":     outputPath,
+		"output_file":     outputName,
 		"paired_end_libs": []map[string]interface{}{},
 		"single_end_libs": []map[string]interface{}{},
 	}
@@ -247,7 +248,7 @@ func processFilename(ws *workspace.Client, path, fileType string, token *auth.To
 
 func main() {
 	os.Args = cli.NormalizePairedEndLibArgs(os.Args)
-	if err := rootCmd.Execute(); err != nil {
+	if err := cliversion.Execute(rootCmd); err != nil {
 		os.Exit(1)
 	}
 }

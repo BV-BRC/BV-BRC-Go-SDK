@@ -35,26 +35,27 @@ import (
 	"github.com/BV-BRC/BV-BRC-Go-SDK/auth"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cli"
 	_ "github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliproduct"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliversion"
 	"github.com/spf13/cobra"
 )
 
 // famTypeMap maps family type names to the feature field used for filtering.
 var famTypeMap = map[string]string{
-	"local":   "plfam_id",
-	"plfam":   "plfam_id",
-	"global":  "pgfam_id",
-	"pgfam":   "pgfam_id",
-	"figfam":  "figfam_id",
-	"fig":     "figfam_id",
+	"local":  "plfam_id",
+	"plfam":  "plfam_id",
+	"global": "pgfam_id",
+	"pgfam":  "pgfam_id",
+	"figfam": "figfam_id",
+	"fig":    "figfam_id",
 }
 
 var (
-	dataOpts  cli.DataOptions
-	colOpts   cli.ColOptions
-	ioOpts    cli.IOOptions
-	gFile     string
-	gCol      string
-	ftype     string
+	dataOpts cli.DataOptions
+	colOpts  cli.ColOptions
+	ioOpts   cli.IOOptions
+	gFile    string
+	gCol     string
+	ftype    string
 )
 
 var rootCmd = &cobra.Command{
@@ -413,7 +414,7 @@ func readGenomeFile(path string, colSpec string) ([]string, error) {
 }
 
 func main() {
-	if err := rootCmd.Execute(); err != nil {
+	if err := cliversion.Execute(rootCmd); err != nil {
 		os.Exit(1)
 	}
 }

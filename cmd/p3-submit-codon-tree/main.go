@@ -19,13 +19,14 @@ import (
 	"github.com/BV-BRC/BV-BRC-Go-SDK/appservice"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/auth"
 	_ "github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliproduct"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliversion"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/workspace"
 	"github.com/spf13/cobra"
 )
 
 var (
-	workspacePrefix   string
-	dryRun            bool
+	workspacePrefix string
+	dryRun          bool
 
 	genomeIDs         string
 	numberOfGenes     int
@@ -226,7 +227,7 @@ func readGenomeFile(filename string) ([]string, error) {
 }
 
 func main() {
-	if err := rootCmd.Execute(); err != nil {
+	if err := cliversion.Execute(rootCmd); err != nil {
 		os.Exit(1)
 	}
 }

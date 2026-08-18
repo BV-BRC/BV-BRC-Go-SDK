@@ -14,10 +14,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cli"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/appservice"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/auth"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cli"
 	_ "github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliproduct"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliversion"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/workspace"
 	"github.com/spf13/cobra"
 )
@@ -35,13 +36,13 @@ var (
 	platform        string
 	readOrientation string
 
-	recipe       string
-	taxonomyID   int
-	taxonomyName string
-	label        string
-	primers      string
+	recipe        string
+	taxonomyID    int
+	taxonomyName  string
+	label         string
+	primers       string
 	primerVersion string
-	minDepth     int
+	minDepth      int
 )
 
 var validRecipes = map[string]bool{
@@ -290,7 +291,7 @@ func processFilename(ws *workspace.Client, path, fileType string, token *auth.To
 
 func main() {
 	os.Args = cli.NormalizePairedEndLibArgs(os.Args)
-	if err := rootCmd.Execute(); err != nil {
+	if err := cliversion.Execute(rootCmd); err != nil {
 		os.Exit(1)
 	}
 }

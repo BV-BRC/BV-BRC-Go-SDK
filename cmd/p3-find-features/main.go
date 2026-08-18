@@ -34,6 +34,7 @@ import (
 	"github.com/BV-BRC/BV-BRC-Go-SDK/auth"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cli"
 	_ "github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliproduct"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliversion"
 	"github.com/spf13/cobra"
 )
 
@@ -42,12 +43,12 @@ import (
 //   - type 2 (uncommon): use individual per-key queries (gene, protein_id, aa_sequence_md5, product)
 //     because these can return multiple results per key value
 var validKeys = map[string]int{
-	"gene":              2,
-	"gene_id":           1,
-	"refseq_locus_tag":  1,
-	"protein_id":        2,
-	"aa_sequence_md5":   2,
-	"product":           2,
+	"gene":             2,
+	"gene_id":          1,
+	"refseq_locus_tag": 1,
+	"protein_id":       2,
+	"aa_sequence_md5":  2,
+	"product":          2,
 }
 
 var (
@@ -338,7 +339,7 @@ func run(cmd *cobra.Command, args []string) error {
 }
 
 func main() {
-	if err := rootCmd.Execute(); err != nil {
+	if err := cliversion.Execute(rootCmd); err != nil {
 		os.Exit(1)
 	}
 }
