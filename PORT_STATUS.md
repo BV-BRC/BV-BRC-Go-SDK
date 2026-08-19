@@ -162,6 +162,57 @@ against p3_cli here:
 
 ---
 
+## The `rast-*` family (sourced from `genome_annotation/scripts/`, in progress)
+
+A second command family is being ported: the **39 `rast-*.pl` scripts** in
+`genome_annotation/scripts/`. They are thin front-ends onto the
+**GenomeAnnotation JSONRPC service** — read a genome typed object (GTO) as JSON
+on stdin, call one service method, write the resulting GTO as pretty JSON on
+stdout — and are what people pipe together to build an annotation by hand.
+
+**Scope: 37 of 39.** All 36 service-call scripts, plus `rast-export-SEED` (no
+service call; a port of `GenomeTypeObject::write_seed_dir`).
+
+**Out of scope: `rast-process-genome-batch` and `rast-download-genome-batch`.**
+Both need Shock/HandleService *upload* and the Go `workspace` package has
+download only. Their Perl originals do not compile in this tree either —
+`Bio::KBase::HandleService` is absent.
+
+**The Go tools keep the `rast-*` names and therefore collide with the Perl
+wrappers** installed in `dev_container/bin/`. This is deliberate: they are meant
+to be drop-in. PATH order decides which one runs, so on a machine with both, put
+whichever you want first. `rast-<name> --version` is the unambiguous check — only
+the Go build has that flag, and it prints the User-Agent the binary sends.
+
+Parity is **semantic, not byte-for-byte**. Perl's JSON output is not canonically
+ordered, so compare with `diff <(jq -S . perl.gto) <(jq -S . go.gto)`. The
+exception is `rast-export-SEED`, whose output should be byte-identical
+(`diff -r`).
+
+Landing in three parts:
+
+| part | contents | state |
+|---|---|---|
+| 1 | `genomeannotation/`, `internal/rastcli/`, `internal/seq/`, tests, packaging-glob fix + guard test | this change |
+| 2 | the 36 service-call commands | pending |
+| 3 | `internal/seeddir/` + `rast-export-SEED` | pending |
+
+### Packaging no longer globs by name prefix
+
+The build scripts used to enumerate the toolkit as `cmd/p3-*/`, which was
+correct only while every command started with `p3-`. Adding a second family that
+way would have shipped a release quietly missing 37 tools: the build succeeds,
+the archive is a plausible size, and only a user notices. All four build scripts
+now use `ls -d cmd/*/`; the rpm `%files` list and `conda-recipe/build.sh` name
+each family explicitly (they glob installed files, not source directories), and
+the shipped README derives its tool count from `cmd/` instead of hard-coding it.
+
+`packaging_test.go` (hermetic — it reads the scripts as text) fails if any of
+those regress or if a new command family appears that the file lists do not
+cover.
+
+---
+
 ## Unported `p3_cli` scripts
 
 As of `p3_cli` master `3e809ac` (2026-06-23) there are **98** `p3_cli/scripts/p3-*.pl`

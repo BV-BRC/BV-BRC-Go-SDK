@@ -14,12 +14,22 @@ This module provides:
 
 ```go
 import (
-    "github.com/BV-BRC/BV-BRC-Go-SDK/api"        // Data API client
-    "github.com/BV-BRC/BV-BRC-Go-SDK/appservice" // Job submission
-    "github.com/BV-BRC/BV-BRC-Go-SDK/auth"       // Authentication
-    "github.com/BV-BRC/BV-BRC-Go-SDK/workspace"  // Workspace/file operations
+    "github.com/BV-BRC/BV-BRC-Go-SDK/api"                // Data API client
+    "github.com/BV-BRC/BV-BRC-Go-SDK/appservice"         // Job submission
+    "github.com/BV-BRC/BV-BRC-Go-SDK/auth"               // Authentication
+    "github.com/BV-BRC/BV-BRC-Go-SDK/genomeannotation"   // Genome annotation service
+    "github.com/BV-BRC/BV-BRC-Go-SDK/workspace"          // Workspace/file operations
 )
 ```
+
+`genomeannotation` is the client for the GenomeAnnotation JSONRPC service that
+the Perl `rast-*` scripts drive. Genome typed objects pass through it as
+`json.RawMessage` and are never decoded, so an annotation step returns the
+genome it was given with the step's additions and nothing else changed —
+decoding into a generic map would renumber integers and reorder keys. Unlike
+the other clients its token is optional: `default_workflow`,
+`enumerate_classifiers` and `enumerate_special_protein_databases` answer
+unauthenticated.
 
 ## Installation
 
@@ -334,12 +344,17 @@ BV-BRC-Go-SDK/
 ├── appservice/             # AppService client (public)
 │   └── client.go
 ├── auth/                   # Authentication (public)
+├── genomeannotation/       # GenomeAnnotation service client (public)
+│   ├── client.go           # JSONRPC transport, CDMI_TIMEOUT, optional auth
+│   └── methods.go          # Annotation steps; GTOs pass through as raw JSON
 ├── workspace/              # Workspace client (public)
 │   └── validate.go         # RequireFolder (output-path existence check)
 ├── internal/
-│   └── cli/                # Shared CLI utilities (TabReader/Writer, options)
-│       └── args.go         # NormalizePairedEndLibArgs (Perl dialect compat)
-├── cmd/                    # 101 CLI commands (one directory each)
+│   ├── cli/                # Shared CLI utilities (TabReader/Writer, options)
+│   │   └── args.go         # NormalizePairedEndLibArgs (Perl dialect compat)
+│   ├── rastcli/            # rast-* flags, IO and params (Perl CmdHelper.pm)
+│   └── seq/                # FASTA reader/writer (60-column, gjoseqlib rules)
+├── cmd/                    # CLI commands (one directory each)
 ├── test/
 │   └── submit-suite/       # CLI integration test suite (reverse-engineers QA fixtures)
 ├── scripts/
