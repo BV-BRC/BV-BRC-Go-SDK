@@ -20,15 +20,41 @@ case "$platform" in
     *)        os="unix" ;;
 esac
 
+# Count the tools rather than hard-coding a number that goes quietly stale
+# every time a command is added. nullglob matters under `set -e`: an unmatched
+# glob left as a literal would be counted as one directory.
+cmd_dir="$(dirname "$0")/../cmd"
+shopt -s nullglob
+p3_dirs=("$cmd_dir"/p3-*/)
+rast_dirs=("$cmd_dir"/rast-*/)
+shopt -u nullglob
+p3_count=${#p3_dirs[@]}
+rast_count=${#rast_dirs[@]}
+total_count=$((p3_count + rast_count))
+
+if [ "$rast_count" -gt 0 ]; then
+    families="${total_count} command-line tools for working with
+the Bacterial and Viral Bioinformatics Resource Center (BV-BRC): ${p3_count}
+\`p3-*\` tools and ${rast_count} \`rast-*\` tools"
+    rast_para="
+
+The \`rast-*\` tools drive the BV-BRC genome annotation service. Each reads a
+genome typed object as JSON, runs one annotation step, and writes the result, so
+they are usually piped one into the next to build up an annotation."
+else
+    families="${p3_count} \`p3-*\` command-line tools for working with
+the Bacterial and Viral Bioinformatics Resource Center (BV-BRC)"
+    rast_para=""
+fi
+
 cat <<EOF
 # BV-BRC Command Line Interface (CLI) Tools
 
 **v${version} — ${platform}**
 
-The BV-BRC CLI is a collection of 101 \`p3-*\` command-line tools for working with
-the Bacterial and Viral Bioinformatics Resource Center (BV-BRC). They cover
-authentication, workspace management, data queries against the BV-BRC data API,
-and submission and monitoring of analysis jobs.
+The BV-BRC CLI is a collection of ${families}.
+The \`p3-*\` tools cover authentication, workspace management, data queries
+against the BV-BRC data API, and submission and monitoring of analysis jobs.${rast_para}
 
 The tools are statically linked and have no runtime dependencies.
 
@@ -38,7 +64,7 @@ EOF
 
 if [ "$os" = "windows" ]; then
     cat <<'EOF'
-    *.exe          the p3-* command-line tools
+    *.exe          the command-line tools
     install.bat    installer (run as Administrator)
     install.ps1    PowerShell installer (run as Administrator)
     README.txt     this file
@@ -57,7 +83,7 @@ Option 2 — manual:
 EOF
 else
     cat <<'EOF'
-    bin/           the p3-* command-line tools
+    bin/           the command-line tools
     README.md      this file
     LICENSE        MIT license
 
@@ -67,7 +93,7 @@ Option 1 — add the bin/ directory to your PATH:
     export PATH="$PWD/bin:$PATH"
 
 Option 2 — install the tools system-wide:
-    sudo cp bin/p3-* /usr/local/bin/
+    sudo cp bin/* /usr/local/bin/
 EOF
 fi
 
