@@ -22,6 +22,7 @@ import (
 
 	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cli"
 	_ "github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliproduct"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliroot"
 	"github.com/spf13/cobra"
 )
 
@@ -472,7 +473,7 @@ func fileExists(path string) bool {
 }
 
 func main() {
-	if err := rootCmd.Execute(); err != nil {
+	if err := cliroot.Execute(rootCmd); err != nil {
 		os.Exit(1)
 	}
 }

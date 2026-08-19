@@ -23,12 +23,13 @@ import (
 	"os"
 	"strings"
 
+	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliroot"
 	"github.com/spf13/cobra"
 )
 
 var (
-	titles  []string
-	noHead  int
+	titles   []string
+	noHead   int
 	dataFile string
 )
 
@@ -114,7 +115,7 @@ func run(cmd *cobra.Command, args []string) error {
 }
 
 func main() {
-	if err := rootCmd.Execute(); err != nil {
+	if err := cliroot.Execute(rootCmd); err != nil {
 		os.Exit(1)
 	}
 }

@@ -14,11 +14,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cli"
-	_ "github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliproduct"
-	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/readspec"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/appservice"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/auth"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cli"
+	_ "github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliproduct"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliroot"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/readspec"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/workspace"
 	"github.com/spf13/cobra"
 )
@@ -352,7 +353,7 @@ func processFilename(ws *workspace.Client, path, fileType string, token *auth.To
 
 func main() {
 	os.Args = cli.NormalizePairedEndLibArgs(os.Args)
-	if err := rootCmd.Execute(); err != nil {
+	if err := cliroot.Execute(rootCmd); err != nil {
 		os.Exit(1)
 	}
 }

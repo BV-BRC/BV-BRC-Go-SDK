@@ -14,10 +14,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cli"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/appservice"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/auth"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cli"
 	_ "github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliproduct"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliroot"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/workspace"
 	"github.com/spf13/cobra"
 )
@@ -31,23 +32,23 @@ var (
 	containerID        string
 
 	// Read library options
-	pairedEndLibs    []string
-	interleavedLibs  []string
-	singleEndLibs    []string
-	srrIDs           []string
-	validateSRR      bool
-	platform         string
-	readOrientation  string
+	pairedEndLibs   []string
+	interleavedLibs []string
+	singleEndLibs   []string
+	srrIDs          []string
+	validateSRR     bool
+	platform        string
+	readOrientation string
 
 	// Assembly options
-	recipe        string
-	trimReads     bool
-	raconIter     int
-	pilonIter     int
-	minContigLen  int
-	minContigCov  int
-	genomeSize    string
-	pipeline      string
+	recipe       string
+	trimReads    bool
+	raconIter    int
+	pilonIter    int
+	minContigLen int
+	minContigCov int
+	genomeSize   string
+	pipeline     string
 )
 
 var rootCmd = &cobra.Command{
@@ -183,11 +184,11 @@ func run(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		pairedLibs = append(pairedLibs, map[string]interface{}{
-			"read1":                     read1,
-			"read2":                     read2,
-			"platform":                  platform,
-			"interleaved":               false,
-			"read_orientation_outward":  readOrientationOutward,
+			"read1":                    read1,
+			"read2":                    read2,
+			"platform":                 platform,
+			"interleaved":              false,
+			"read_orientation_outward": readOrientationOutward,
 		})
 	}
 
@@ -198,10 +199,10 @@ func run(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		pairedLibs = append(pairedLibs, map[string]interface{}{
-			"read1":                     read1,
-			"platform":                  platform,
-			"interleaved":               true,
-			"read_orientation_outward":  readOrientationOutward,
+			"read1":                    read1,
+			"platform":                 platform,
+			"interleaved":              true,
+			"read_orientation_outward": readOrientationOutward,
 		})
 	}
 	params["paired_end_libs"] = pairedLibs
@@ -330,7 +331,7 @@ func formatSize(size int64) string {
 
 func main() {
 	os.Args = cli.NormalizePairedEndLibArgs(os.Args)
-	if err := rootCmd.Execute(); err != nil {
+	if err := cliroot.Execute(rootCmd); err != nil {
 		os.Exit(1)
 	}
 }

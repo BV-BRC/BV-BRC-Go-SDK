@@ -15,6 +15,7 @@ import (
 	"github.com/BV-BRC/BV-BRC-Go-SDK/appservice"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/auth"
 	_ "github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliproduct"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliroot"
 	"github.com/spf13/cobra"
 )
 
@@ -129,7 +130,7 @@ func writeOutput(client *appservice.Client, url, file string) error {
 }
 
 func main() {
-	if err := rootCmd.Execute(); err != nil {
+	if err := cliroot.Execute(rootCmd); err != nil {
 		os.Exit(1)
 	}
 }
