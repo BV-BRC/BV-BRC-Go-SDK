@@ -14,8 +14,12 @@ OUTPUT_DIR="dist"
 cd "$(dirname "$0")"
 SDK_DIR="$(pwd)"
 
-# Get list of all commands
-COMMANDS=$(ls -d cmd/p3-*/ | xargs -n1 basename)
+# Get list of all commands.
+#
+# Glob every cmd/ directory rather than a name prefix. The toolkit is p3-* plus
+# rast-*, and a prefix glob ships half of it without failing -- which is why
+# TestBuildScriptsEnumerateEveryCommand exists.
+COMMANDS=$(ls -d cmd/*/ | xargs -n1 basename)
 CMD_COUNT=$(echo $COMMANDS | wc -w)
 
 echo "Building BV-BRC CLI tools v${VERSION} for Linux"
@@ -169,6 +173,7 @@ cp -r %{_sourcedir}/bin/* %{buildroot}/usr/local/bin/
 
 %files
 /usr/local/bin/p3-*
+/usr/local/bin/rast-*
 
 %post
 echo "BV-BRC CLI tools installed successfully!"
@@ -247,7 +252,7 @@ echo "Installation options:"
 echo ""
 echo "  1. Using tarball:"
 echo "     tar -xzf bvbrc-cli-${VERSION}-linux-amd64.tar.gz"
-echo "     sudo cp bin/p3-* /usr/local/bin/"
+echo "     sudo cp bin/* /usr/local/bin/"
 echo ""
 echo "  2. Using .deb (Debian/Ubuntu):"
 echo "     sudo dpkg -i bvbrc-cli_${VERSION}_amd64.deb"

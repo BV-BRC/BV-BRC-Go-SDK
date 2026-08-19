@@ -162,6 +162,153 @@ against p3_cli here:
 
 ---
 
+## The `rast-*` family (sourced from `genome_annotation/scripts/`, in progress)
+
+A second command family is being ported: the **39 `rast-*.pl` scripts** in
+`genome_annotation/scripts/`. They are thin front-ends onto the
+**GenomeAnnotation JSONRPC service** — read a genome typed object (GTO) as JSON
+on stdin, call one service method, write the resulting GTO as pretty JSON on
+stdout — and are what people pipe together to build an annotation by hand.
+
+**Scope: 37 of 39.** All 36 service-call scripts, plus `rast-export-SEED` (no
+service call; a port of `GenomeTypeObject::write_seed_dir`).
+
+**Out of scope: `rast-process-genome-batch` and `rast-download-genome-batch`.**
+Both need Shock/HandleService *upload* and the Go `workspace` package has
+download only. Their Perl originals do not compile in this tree either —
+`Bio::KBase::HandleService` is absent.
+
+**The Go tools keep the `rast-*` names and therefore collide with the Perl
+wrappers** installed in `dev_container/bin/`. This is deliberate: they are meant
+to be drop-in. PATH order decides which one runs, so on a machine with both, put
+whichever you want first. `rast-<name> --version` is the unambiguous check — only
+the Go build has that flag, and it prints the User-Agent the binary sends.
+
+Parity is **semantic, not byte-for-byte**. Perl's JSON output is not canonically
+ordered, so compare with `diff <(jq -S . perl.gto) <(jq -S . go.gto)`. The
+exception is `rast-export-SEED`, whose output should be byte-identical
+(`diff -r`).
+
+Landing in three parts:
+
+| part | contents | state |
+|---|---|---|
+| 1 | `genomeannotation/`, `internal/rastcli/`, `internal/seq/`, tests, packaging-glob fix + guard test | landed |
+| 2 | the 36 service-call commands | landed |
+| 3 | `internal/seeddir/` + `rast-export-SEED` | this change |
+
+### Verified against the Perl (2026-08-18)
+
+Run live against `p3.theseed.org` on a three-contig test genome:
+
+| command | result |
+|---|---|
+| `rast-create-genome` | `jq -S` identical |
+| `rast-set-metadata` | `jq -S` identical |
+| `rast-export-genome gff` | byte-identical |
+| `rast-call-features-CDS-prodigal` | `jq -S` identical after deleting `execute_time`, the server's temp-dir paths and the `feature_creation_event` UUID — all server-side nondeterminism, not port differences |
+| `rast-export-SEED` | **byte-identical** (`diff -r`), on both a prodigal-called genome and a hand-built one carrying a `taxonomy` list, `close_genomes`, aliases, a minus-strand CDS with no `protein_translation`, a two-part `rna` location, a length-1 minus-strand part, a null annotator and an annotation comment already ending in a newline |
+
+The `rast-export-SEED` case is the one that had to be byte-exact, and two
+details are why it is. Feature coordinates and annotation timestamps are carried
+as raw JSON (`seeddir.Scalar`) rather than decoded to numbers: an annotation
+time arrives as `1787100528.18559` and Go's float printer would have rendered it
+`1.78710052818559e+09`. And the peg/CDS test that decides whether a feature's
+DNA gets translated is applied to the *mapped* type, as the Perl applies it,
+not the type the feature arrived with.
+
+**One deliberate divergence, in `internal/seeddir/translate.go`.**
+`SeedUtils::genetic_code` spells the overrides for NCBI tables 2 and 3 in RNA
+(`AUA`, `UGA`, `CUU`…) while the table it edits is keyed on DNA and `translate`
+uppercases DNA — so in Perl every U-bearing override is looked up under a key
+that can never occur, and codes 2 and 3 quietly translate as code 1. The Go port
+uses the real NCBI tables. Codes 1, 4 and 11 — the only ones this pipeline uses —
+are identical either way, so this changes no output in practice; it only means a
+mitochondrial genome is not silently mistranslated. An unsupported code is an
+error rather than a fallback.
+
+### Ported `rast-*` commands
+
+Same convention as the `p3_cli` ledger above: "Synced to" is the latest
+`genome_annotation` commit touching that script which the Go command reflects.
+Regenerate the current state of every row with:
+
+```bash
+cd modules
+for d in $(ls -d BV-BRC-Go-SDK/cmd/rast-*/ | xargs -n1 basename); do
+  latest=$(cd genome_annotation && git log master -1 --format='%h %ad' --date=short -- "scripts/$d.pl")
+  echo "$d  latest=$latest"   # compare against "Synced to" below
+done
+```
+
+These scripts are stable — most have not been touched since 2014 — so a
+non-empty diff here is unusual and worth reading closely.
+
+| Go command | Perl script | Synced to | date | Status |
+|---|---|---|---|---|
+| `rast-add-contigs` | `rast-add-contigs.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-add-features` | `rast-add-features.pl` | `ac5023a` | 2014-09-19 | ✅ |
+| `rast-annotate-families-patric` | `rast-annotate-families-patric.pl` | `9e3c0db` | 2016-01-26 | ✅ |
+| `rast-annotate-proteins-kmer-v1` | `rast-annotate-proteins-kmer-v1.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-annotate-proteins-kmer-v2` | `rast-annotate-proteins-kmer-v2.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-annotate-proteins-similarity` | `rast-annotate-proteins-similarity.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-annotate-special-proteins` | `rast-annotate-special-proteins.pl` | `eb6fa94` | 2015-05-27 | ✅ |
+| `rast-call-features-CDS-genemark` | `rast-call-features-CDS-genemark.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-call-features-CDS-glimmer3` | `rast-call-features-CDS-glimmer3.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-call-features-CDS-prodigal` | `rast-call-features-CDS-prodigal.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-call-features-crispr` | `rast-call-features-crispr.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-call-features-insertion-sequences` | `rast-call-features-insertion-sequences.pl` | `e1f0a27` | 2014-09-18 | ✅ |
+| `rast-call-features-prophage-phispy` | `rast-call-features-prophage-phispy.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-call-features-ProtoCDS-kmer-v1` | `rast-call-features-ProtoCDS-kmer-v1.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-call-features-ProtoCDS-kmer-v2` | `rast-call-features-ProtoCDS-kmer-v2.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-call-features-pyrrolysoprotein` | `rast-call-features-pyrrolysoprotein.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-call-features-repeat-region-SEED` | `rast-call-features-repeat-region-SEED.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-call-features-rRNA-SEED` | `rast-call-features-rRNA-SEED.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-call-features-selenoprotein` | `rast-call-features-selenoprotein.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-call-features-strep-pneumo-repeat` | `rast-call-features-strep-pneumo-repeat.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-call-features-strep-suis-repeat` | `rast-call-features-strep-suis-repeat.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-call-features-tRNA-trnascan` | `rast-call-features-tRNA-trnascan.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-classify` | `rast-classify.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-compute-special-proteins` | `rast-compute-special-proteins.pl` | `462e88b` | 2014-10-24 | ✅ |
+| `rast-create-genome` | `rast-create-genome.pl` | `39099db` | 2015-11-18 | ✅ |
+| `rast-create-genome-from-RAST` | `rast-create-genome-from-RAST.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-enumerate-classifiers` | `rast-enumerate-classifiers.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-enumerate-special-protein-databases` | `rast-enumerate-special-protein-databases.pl` | `462e88b` | 2014-10-24 | ✅ |
+| `rast-export-genome` | `rast-export-genome.pl` | `9ed9769` | 2016-12-02 | ✅ |
+| `rast-export-SEED` | `rast-export-SEED.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-get-default-workflow` | `rast-get-default-workflow.pl` | `23056f2` | 2015-05-27 | ✅ |
+| `rast-process-genome` | `rast-process-genome.pl` | `efc944c` | 2016-12-02 | ✅ |
+| `rast-query-classifier-groups` | `rast-query-classifier-groups.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-query-genome-batch` | `rast-query-genome-batch.pl` | `439abc0` | 2014-11-05 | ✅ |
+| `rast-resolve-overlapping-features` | `rast-resolve-overlapping-features.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-set-metadata` | `rast-set-metadata.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-update-functions` | `rast-update-functions.pl` | `2e7d19e` | 2014-09-23 | ✅ |
+
+### Where the Go tools differ from the Perl on purpose
+
+| command | difference |
+|---|---|
+| `rast-process-genome` | `--batch-input-directory` / `--batch-input-file` are **not accepted**. The Perl declares them and never reads them, so a batch invocation silently ran in immediate mode on standard input. Failing on an unknown flag says so. `--timeout` is accepted and **works** (it sets the HTTP timeout for the pipeline call); the Perl declares it and never reads it. |
+| `rast-query-classifier-groups` | Output is sorted by group number. The Perl iterates a hash, so its order varies between runs. |
+| `rast-classify` | Bins are sorted by count descending with the bin name as tiebreak, for the same reason. |
+| `rast-export-SEED` | NCBI translation tables 2 and 3 are correct here; see the divergence note above. |
+
+### Packaging no longer globs by name prefix
+
+The build scripts used to enumerate the toolkit as `cmd/p3-*/`, which was
+correct only while every command started with `p3-`. Adding a second family that
+way would have shipped a release quietly missing 37 tools: the build succeeds,
+the archive is a plausible size, and only a user notices. All four build scripts
+now use `ls -d cmd/*/`; the rpm `%files` list and `conda-recipe/build.sh` name
+each family explicitly (they glob installed files, not source directories), and
+the shipped README derives its tool count from `cmd/` instead of hard-coding it.
+
+`packaging_test.go` (hermetic — it reads the scripts as text) fails if any of
+those regress or if a new command family appears that the file lists do not
+cover.
+
+---
+
 ## Unported `p3_cli` scripts
 
 As of `p3_cli` master `3e809ac` (2026-06-23) there are **98** `p3_cli/scripts/p3-*.pl`
