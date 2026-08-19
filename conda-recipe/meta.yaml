@@ -51,8 +51,9 @@ about:
   summary: BV-BRC Command Line Interface Tools
   description: |
     Command-line tools for interacting with the BV-BRC (Bacterial and Viral
-    Bioinformatics Resource Center) platform. Includes 101 commands for
-    authentication, workspace management, data queries, and job submission.
+    Bioinformatics Resource Center) platform. The p3-* commands cover
+    authentication, workspace management, data queries, and job submission;
+    the rast-* commands drive the genome annotation service.
   doc_url: https://www.bv-brc.org/docs/cli_tutorial/
   dev_url: https://github.com/BV-BRC/BV-BRC-Go-SDK
 

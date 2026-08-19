@@ -8,22 +8,33 @@ Bioinformatics Resource Center).
 This module provides:
 
 1. **Go libraries** for programmatic access to BV-BRC services
-2. **CLI tools** (101 commands) mirroring the Perl `p3_cli` suite
+2. **CLI tools** (138 commands): 101 `p3-*` mirroring the Perl `p3_cli` suite,
+   and 37 `rast-*` mirroring `genome_annotation/scripts/`
 
 ### Go Libraries
 
 ```go
 import (
-    "github.com/BV-BRC/BV-BRC-Go-SDK/api"        // Data API client
-    "github.com/BV-BRC/BV-BRC-Go-SDK/appservice" // Job submission
-    "github.com/BV-BRC/BV-BRC-Go-SDK/auth"       // Authentication
-    "github.com/BV-BRC/BV-BRC-Go-SDK/workspace"  // Workspace/file operations
+    "github.com/BV-BRC/BV-BRC-Go-SDK/api"                // Data API client
+    "github.com/BV-BRC/BV-BRC-Go-SDK/appservice"         // Job submission
+    "github.com/BV-BRC/BV-BRC-Go-SDK/auth"               // Authentication
+    "github.com/BV-BRC/BV-BRC-Go-SDK/genomeannotation"   // Genome annotation service
+    "github.com/BV-BRC/BV-BRC-Go-SDK/workspace"          // Workspace/file operations
 )
 ```
 
+`genomeannotation` is the client for the GenomeAnnotation JSONRPC service that
+the Perl `rast-*` scripts drive. Genome typed objects pass through it as
+`json.RawMessage` and are never decoded, so an annotation step returns the
+genome it was given with the step's additions and nothing else changed —
+decoding into a generic map would renumber integers and reorder keys. Unlike
+the other clients its token is optional: `default_workflow`,
+`enumerate_classifiers` and `enumerate_special_protein_databases` answer
+unauthenticated.
+
 ## Installation
 
-Current release: **2.0.14**. Substitute another version below to install it;
+Current release: **2.0.15**. Substitute another version below to install it;
 the archives are attached to each
 [GitHub release](https://github.com/BV-BRC/BV-BRC-Go-SDK/releases).
 
@@ -42,43 +53,43 @@ Each archive expands into a versioned directory containing `bin/` — not a bare
 
 ```bash
 # x86_64
-curl -LO https://github.com/BV-BRC/BV-BRC-Go-SDK/releases/download/v2.0.14/bvbrc-cli-2.0.14-linux-amd64.tar.gz
-tar -xzf bvbrc-cli-2.0.14-linux-amd64.tar.gz
-sudo cp bvbrc-cli-2.0.14-linux-amd64/bin/p3-* /usr/local/bin/
+curl -LO https://github.com/BV-BRC/BV-BRC-Go-SDK/releases/download/v2.0.15/bvbrc-cli-2.0.15-linux-amd64.tar.gz
+tar -xzf bvbrc-cli-2.0.15-linux-amd64.tar.gz
+sudo cp bvbrc-cli-2.0.15-linux-amd64/bin/* /usr/local/bin/
 
 # ARM64 (e.g. Raspberry Pi, AWS Graviton)
-curl -LO https://github.com/BV-BRC/BV-BRC-Go-SDK/releases/download/v2.0.14/bvbrc-cli-2.0.14-linux-arm64.tar.gz
-tar -xzf bvbrc-cli-2.0.14-linux-arm64.tar.gz
-sudo cp bvbrc-cli-2.0.14-linux-arm64/bin/p3-* /usr/local/bin/
+curl -LO https://github.com/BV-BRC/BV-BRC-Go-SDK/releases/download/v2.0.15/bvbrc-cli-2.0.15-linux-arm64.tar.gz
+tar -xzf bvbrc-cli-2.0.15-linux-arm64.tar.gz
+sudo cp bvbrc-cli-2.0.15-linux-arm64/bin/* /usr/local/bin/
 ```
 
 A `.deb` is also published for each architecture, and installs into
 `/usr/local/bin`:
 
 ```bash
-curl -LO https://github.com/BV-BRC/BV-BRC-Go-SDK/releases/download/v2.0.14/bvbrc-cli_2.0.14_amd64.deb
-sudo dpkg -i bvbrc-cli_2.0.14_amd64.deb
+curl -LO https://github.com/BV-BRC/BV-BRC-Go-SDK/releases/download/v2.0.15/bvbrc-cli_2.0.15_amd64.deb
+sudo dpkg -i bvbrc-cli_2.0.15_amd64.deb
 ```
 
 ### macOS
 
 ```bash
 # Apple Silicon
-curl -LO https://github.com/BV-BRC/BV-BRC-Go-SDK/releases/download/v2.0.14/bvbrc-cli-2.0.14-darwin-arm64.tar.gz
-tar -xzf bvbrc-cli-2.0.14-darwin-arm64.tar.gz
-sudo cp bvbrc-cli-2.0.14-darwin-arm64/bin/p3-* /usr/local/bin/
+curl -LO https://github.com/BV-BRC/BV-BRC-Go-SDK/releases/download/v2.0.15/bvbrc-cli-2.0.15-darwin-arm64.tar.gz
+tar -xzf bvbrc-cli-2.0.15-darwin-arm64.tar.gz
+sudo cp bvbrc-cli-2.0.15-darwin-arm64/bin/* /usr/local/bin/
 
 # Intel
-curl -LO https://github.com/BV-BRC/BV-BRC-Go-SDK/releases/download/v2.0.14/bvbrc-cli-2.0.14-darwin-amd64.tar.gz
-tar -xzf bvbrc-cli-2.0.14-darwin-amd64.tar.gz
-sudo cp bvbrc-cli-2.0.14-darwin-amd64/bin/p3-* /usr/local/bin/
+curl -LO https://github.com/BV-BRC/BV-BRC-Go-SDK/releases/download/v2.0.15/bvbrc-cli-2.0.15-darwin-amd64.tar.gz
+tar -xzf bvbrc-cli-2.0.15-darwin-amd64.tar.gz
+sudo cp bvbrc-cli-2.0.15-darwin-amd64/bin/* /usr/local/bin/
 ```
 
 A `darwin-universal` tarball containing fat binaries for both architectures is
 also published, if you would rather ship one build to mixed hardware.
 
 > **macOS note:** binaries are not yet code-signed. If Gatekeeper blocks them,
-> run `xattr -dr com.apple.quarantine /usr/local/bin/p3-*` after copying, or
+> run `xattr -dr com.apple.quarantine /usr/local/bin/p3-* /usr/local/bin/rast-*` after copying, or
 > extract with `curl` rather than a browser (browser downloads set the quarantine
 > attribute; `curl`/`wget` do not).
 
@@ -86,11 +97,11 @@ also published, if you would rather ship one build to mixed hardware.
 
 ```powershell
 # x64 (most PCs)
-# Download bvbrc-cli-2.0.14-windows-amd64.zip from the releases page, then:
-Expand-Archive bvbrc-cli-2.0.14-windows-amd64.zip .
+# Download bvbrc-cli-2.0.15-windows-amd64.zip from the releases page, then:
+Expand-Archive bvbrc-cli-2.0.15-windows-amd64.zip .
 # The .exe files sit at the top of the extracted directory (no bin\ on Windows).
 # Copy them to a directory on your PATH, e.g.:
-Copy-Item bvbrc-cli-2.0.14-windows-amd64\p3-*.exe C:\Windows\System32\
+Copy-Item bvbrc-cli-2.0.15-windows-amd64\*.exe C:\Windows\System32\
 p3-login
 ```
 
@@ -104,21 +115,21 @@ powershell -ExecutionPolicy Bypass -File install.ps1
 
 ```bash
 # Linux / macOS: verify checksums
-curl -LO https://github.com/BV-BRC/BV-BRC-Go-SDK/releases/download/v2.0.14/bvbrc-cli-2.0.14-checksums.sha256
-sha256sum -c bvbrc-cli-2.0.14-checksums.sha256
+curl -LO https://github.com/BV-BRC/BV-BRC-Go-SDK/releases/download/v2.0.15/bvbrc-cli-2.0.15-checksums.sha256
+sha256sum -c bvbrc-cli-2.0.15-checksums.sha256
 ```
 
 ```powershell
 # Windows: verify checksum of a single file
-Get-FileHash bvbrc-cli-2.0.14-windows-amd64.zip -Algorithm SHA256
+Get-FileHash bvbrc-cli-2.0.15-windows-amd64.zip -Algorithm SHA256
 ```
 
 Every command takes `--version`:
 
 ```bash
 $ p3-ls --version
-p3-ls 2.0.14
-bvbrc-cli-go/2.0.14 linux/amd64 go1.25.6
+p3-ls 2.0.15
+bvbrc-cli-go/2.0.15 linux/amd64 go1.25.6
 ```
 
 The second line is the exact `User-Agent` that binary sends, so it also reports
@@ -130,7 +141,7 @@ for its version; use `make` or a build script. To read the stamp without
 running the binary:
 
 ```bash
-go version -m $(which p3-ls) | grep ldflags   # -X .../version.Version=2.0.14
+go version -m $(which p3-ls) | grep ldflags   # -X .../version.Version=2.0.15
 ```
 
 ## Getting Started
@@ -329,9 +340,9 @@ go build -buildvcs=false ./...      # verify everything compiles
 make                                 # build to bin/
 
 # Release builds (static, stripped, version stamped into the binaries)
-VERSION=2.0.14 ./build-linux.sh      # Linux amd64 + arm64 + .deb
-VERSION=2.0.14 ./build-macos.sh      # macOS Intel + Apple Silicon + universal
-VERSION=2.0.14 ./build-windows.sh    # Windows x64 + ARM64
+VERSION=2.0.15 ./build-linux.sh      # Linux amd64 + arm64 + .deb
+VERSION=2.0.15 ./build-macos.sh      # macOS Intel + Apple Silicon + universal
+VERSION=2.0.15 ./build-windows.sh    # Windows x64 + ARM64
 
 # Single command
 go build -buildvcs=false -o bin/p3-all-genomes ./cmd/p3-all-genomes
@@ -364,15 +375,15 @@ Build scripts produce packages in `dist/`:
 
 | Platform | Package | Layout |
 |----------|---------|--------|
-| Linux x86_64 | `bvbrc-cli-VERSION-linux-amd64.tar.gz` | `<dir>/bin/p3-*` |
-| Linux ARM64 | `bvbrc-cli-VERSION-linux-arm64.tar.gz` | `<dir>/bin/p3-*` |
+| Linux x86_64 | `bvbrc-cli-VERSION-linux-amd64.tar.gz` | `<dir>/bin/p3-*`, `<dir>/bin/rast-*` |
+| Linux ARM64 | `bvbrc-cli-VERSION-linux-arm64.tar.gz` | `<dir>/bin/p3-*`, `<dir>/bin/rast-*` |
 | Linux x86_64 (Debian) | `bvbrc-cli_VERSION_amd64.deb` | `/usr/local/bin` |
 | Linux ARM64 (Debian) | `bvbrc-cli_VERSION_arm64.deb` | `/usr/local/bin` |
-| macOS Intel | `bvbrc-cli-VERSION-darwin-amd64.tar.gz` | `<dir>/bin/p3-*` |
-| macOS Apple Silicon | `bvbrc-cli-VERSION-darwin-arm64.tar.gz` | `<dir>/bin/p3-*` |
-| macOS universal | `bvbrc-cli-VERSION-darwin-universal.tar.gz` | `<dir>/bin/p3-*` |
-| Windows x64 | `bvbrc-cli-VERSION-windows-amd64.zip` | `<dir>\p3-*.exe` |
-| Windows ARM64 | `bvbrc-cli-VERSION-windows-arm64.zip` | `<dir>\p3-*.exe` |
+| macOS Intel | `bvbrc-cli-VERSION-darwin-amd64.tar.gz` | `<dir>/bin/p3-*`, `<dir>/bin/rast-*` |
+| macOS Apple Silicon | `bvbrc-cli-VERSION-darwin-arm64.tar.gz` | `<dir>/bin/p3-*`, `<dir>/bin/rast-*` |
+| macOS universal | `bvbrc-cli-VERSION-darwin-universal.tar.gz` | `<dir>/bin/p3-*`, `<dir>/bin/rast-*` |
+| Windows x64 | `bvbrc-cli-VERSION-windows-amd64.zip` | `<dir>\p3-*.exe`, `<dir>\rast-*.exe` |
+| Windows ARM64 | `bvbrc-cli-VERSION-windows-arm64.zip` | `<dir>\p3-*.exe`, `<dir>\rast-*.exe` |
 
 `<dir>` is `bvbrc-cli-VERSION-<platform>`; every archive expands into one, and
 each also carries a generated `README` and the `LICENSE`.
@@ -383,7 +394,7 @@ covering all of the above, and Apptainer/Singularity images
 with the tools preinstalled in `/usr/local/bin`:
 
 ```bash
-apptainer exec bvbrc-cli-2.0.14-ubuntu-24-amd64.sif p3-all-genomes --limit 1
+apptainer exec bvbrc-cli-2.0.15-ubuntu-24-amd64.sif p3-all-genomes --limit 1
 ```
 
 Published packages are built by CI from a `v*` tag pushed to this repository —
@@ -401,12 +412,17 @@ BV-BRC-Go-SDK/
 ├── appservice/             # AppService client (public)
 │   └── client.go
 ├── auth/                   # Authentication (public)
+├── genomeannotation/       # GenomeAnnotation service client (public)
+│   ├── client.go           # JSONRPC transport, CDMI_TIMEOUT, optional auth
+│   └── methods.go          # Annotation steps; GTOs pass through as raw JSON
 ├── workspace/              # Workspace client (public)
 │   └── validate.go         # RequireFolder (output-path existence check)
 ├── internal/
-│   └── cli/                # Shared CLI utilities (TabReader/Writer, options)
-│       └── args.go         # NormalizePairedEndLibArgs (Perl dialect compat)
-├── cmd/                    # 101 CLI commands (one directory each)
+│   ├── cli/                # Shared CLI utilities (TabReader/Writer, options)
+│   │   └── args.go         # NormalizePairedEndLibArgs (Perl dialect compat)
+│   ├── rastcli/            # rast-* flags, IO and params (Perl CmdHelper.pm)
+│   └── seq/                # FASTA reader/writer (60-column, gjoseqlib rules)
+├── cmd/                    # CLI commands (one directory each)
 ├── test/
 │   └── submit-suite/       # CLI integration test suite (reverse-engineers QA fixtures)
 ├── scripts/

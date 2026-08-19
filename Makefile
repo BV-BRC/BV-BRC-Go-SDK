@@ -13,6 +13,12 @@ BUILD_TIME ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 VERSION_PKG := github.com/BV-BRC/BV-BRC-Go-SDK/version
 LDFLAGS := -ldflags "-X $(VERSION_PKG).Version=$(VERSION) -X main.Version=$(VERSION) -X main.BuildTime=$(BUILD_TIME)"
 
+# VCS stamping off. A checkout that sits under another VCS working copy (the
+# dev_container tree mixes git and svn) makes the toolchain refuse to build at
+# all: "error obtaining VCS status: multiple VCS detected". We stamp the version
+# through LDFLAGS above, so the build-info metadata buys us nothing.
+BUILDFLAGS := -buildvcs=false
+
 # Output directory
 BIN_DIR := bin
 
@@ -31,7 +37,7 @@ build: $(COMMANDS)
 .PHONY: $(COMMANDS)
 $(COMMANDS):
 	@mkdir -p $(BIN_DIR)
-	$(GO) build $(LDFLAGS) -o $(BIN_DIR)/$@ ./cmd/$@
+	$(GO) build $(BUILDFLAGS) $(LDFLAGS) -o $(BIN_DIR)/$@ ./cmd/$@
 
 # Run tests
 .PHONY: test
