@@ -193,9 +193,73 @@ Landing in three parts:
 
 | part | contents | state |
 |---|---|---|
-| 1 | `genomeannotation/`, `internal/rastcli/`, `internal/seq/`, tests, packaging-glob fix + guard test | this change |
-| 2 | the 36 service-call commands | pending |
+| 1 | `genomeannotation/`, `internal/rastcli/`, `internal/seq/`, tests, packaging-glob fix + guard test | landed |
+| 2 | the 36 service-call commands | this change |
 | 3 | `internal/seeddir/` + `rast-export-SEED` | pending |
+
+### Ported `rast-*` commands
+
+Same convention as the `p3_cli` ledger above: "Synced to" is the latest
+`genome_annotation` commit touching that script which the Go command reflects.
+Regenerate the current state of every row with:
+
+```bash
+cd modules
+for d in $(ls -d BV-BRC-Go-SDK/cmd/rast-*/ | xargs -n1 basename); do
+  latest=$(cd genome_annotation && git log master -1 --format='%h %ad' --date=short -- "scripts/$d.pl")
+  echo "$d  latest=$latest"   # compare against "Synced to" below
+done
+```
+
+These scripts are stable — most have not been touched since 2014 — so a
+non-empty diff here is unusual and worth reading closely.
+
+| Go command | Perl script | Synced to | date | Status |
+|---|---|---|---|---|
+| `rast-add-contigs` | `rast-add-contigs.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-add-features` | `rast-add-features.pl` | `ac5023a` | 2014-09-19 | ✅ |
+| `rast-annotate-families-patric` | `rast-annotate-families-patric.pl` | `9e3c0db` | 2016-01-26 | ✅ |
+| `rast-annotate-proteins-kmer-v1` | `rast-annotate-proteins-kmer-v1.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-annotate-proteins-kmer-v2` | `rast-annotate-proteins-kmer-v2.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-annotate-proteins-similarity` | `rast-annotate-proteins-similarity.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-annotate-special-proteins` | `rast-annotate-special-proteins.pl` | `eb6fa94` | 2015-05-27 | ✅ |
+| `rast-call-features-CDS-genemark` | `rast-call-features-CDS-genemark.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-call-features-CDS-glimmer3` | `rast-call-features-CDS-glimmer3.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-call-features-CDS-prodigal` | `rast-call-features-CDS-prodigal.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-call-features-crispr` | `rast-call-features-crispr.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-call-features-insertion-sequences` | `rast-call-features-insertion-sequences.pl` | `e1f0a27` | 2014-09-18 | ✅ |
+| `rast-call-features-prophage-phispy` | `rast-call-features-prophage-phispy.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-call-features-ProtoCDS-kmer-v1` | `rast-call-features-ProtoCDS-kmer-v1.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-call-features-ProtoCDS-kmer-v2` | `rast-call-features-ProtoCDS-kmer-v2.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-call-features-pyrrolysoprotein` | `rast-call-features-pyrrolysoprotein.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-call-features-repeat-region-SEED` | `rast-call-features-repeat-region-SEED.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-call-features-rRNA-SEED` | `rast-call-features-rRNA-SEED.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-call-features-selenoprotein` | `rast-call-features-selenoprotein.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-call-features-strep-pneumo-repeat` | `rast-call-features-strep-pneumo-repeat.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-call-features-strep-suis-repeat` | `rast-call-features-strep-suis-repeat.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-call-features-tRNA-trnascan` | `rast-call-features-tRNA-trnascan.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-classify` | `rast-classify.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-compute-special-proteins` | `rast-compute-special-proteins.pl` | `462e88b` | 2014-10-24 | ✅ |
+| `rast-create-genome` | `rast-create-genome.pl` | `39099db` | 2015-11-18 | ✅ |
+| `rast-create-genome-from-RAST` | `rast-create-genome-from-RAST.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-enumerate-classifiers` | `rast-enumerate-classifiers.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-enumerate-special-protein-databases` | `rast-enumerate-special-protein-databases.pl` | `462e88b` | 2014-10-24 | ✅ |
+| `rast-export-genome` | `rast-export-genome.pl` | `9ed9769` | 2016-12-02 | ✅ |
+| `rast-get-default-workflow` | `rast-get-default-workflow.pl` | `23056f2` | 2015-05-27 | ✅ |
+| `rast-process-genome` | `rast-process-genome.pl` | `efc944c` | 2016-12-02 | ✅ |
+| `rast-query-classifier-groups` | `rast-query-classifier-groups.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-query-genome-batch` | `rast-query-genome-batch.pl` | `439abc0` | 2014-11-05 | ✅ |
+| `rast-resolve-overlapping-features` | `rast-resolve-overlapping-features.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-set-metadata` | `rast-set-metadata.pl` | `28438b8` | 2014-09-11 | ✅ |
+| `rast-update-functions` | `rast-update-functions.pl` | `2e7d19e` | 2014-09-23 | ✅ |
+
+### Where the Go tools differ from the Perl on purpose
+
+| command | difference |
+|---|---|
+| `rast-process-genome` | `--batch-input-directory` / `--batch-input-file` are **not accepted**. The Perl declares them and never reads them, so a batch invocation silently ran in immediate mode on standard input. Failing on an unknown flag says so. `--timeout` is accepted and **works** (it sets the HTTP timeout for the pipeline call); the Perl declares it and never reads it. |
+| `rast-query-classifier-groups` | Output is sorted by group number. The Perl iterates a hash, so its order varies between runs. |
+| `rast-classify` | Bins are sorted by count descending with the bin name as tiebreak, for the same reason. |
 
 ### Packaging no longer globs by name prefix
 

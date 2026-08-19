@@ -8,7 +8,8 @@ Bioinformatics Resource Center).
 This module provides:
 
 1. **Go libraries** for programmatic access to BV-BRC services
-2. **CLI tools** (101 commands) mirroring the Perl `p3_cli` suite
+2. **CLI tools** (137 commands): 101 `p3-*` mirroring the Perl `p3_cli` suite,
+   and 36 `rast-*` mirroring `genome_annotation/scripts/`
 
 ### Go Libraries
 
