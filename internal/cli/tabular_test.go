@@ -176,6 +176,20 @@ func TestFormatValue(t *testing.T) {
 		{"string slice", []string{"a", "b", "c"}, "::", "a::b::c"},
 		{"string slice comma", []string{"a", "b", "c"}, ",", "a,b,c"},
 		{"any slice", []any{"x", 1, true}, "::", "x::1::true"},
+
+		// JSON decoding yields float64 for every numeric field; none of these
+		// may come out in scientific notation.
+		{"float64 taxon id", float64(1004021), "::", "1004021"},
+		{"float64 genome length", float64(5000000), "::", "5000000"},
+		{"float64 small integral", float64(578), "::", "578"},
+		{"float64 fractional", float64(511145.12), "::", "511145.12"},
+		{"float64 zero", float64(0), "::", "0"},
+		{"float64 negative large", float64(-2500000), "::", "-2500000"},
+		{"float64 very large integral", float64(1e15), "::", "1000000000000000"},
+		{"float64 small fraction", float64(0.0001), "::", "0.0001"},
+		{"any slice of large numerics", []any{float64(10239), float64(1004021), float64(10240)}, "::", "10239::1004021::10240"},
+		{"any slice of large numerics comma", []any{float64(2), float64(5000000)}, ",", "2,5000000"},
+		{"any slice mixed", []any{"Poxviridae", float64(1004021)}, "::", "Poxviridae::1004021"},
 	}
 
 	for _, tt := range tests {

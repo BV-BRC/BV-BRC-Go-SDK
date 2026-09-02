@@ -691,6 +691,22 @@ func (c *Client) QueryCallback(ctx context.Context, objectType string, q *Query,
 	}
 }
 
+// appendLimitClause appends a limit(n) clause to an already-built query body.
+//
+// Query.Build does not emit a limit clause of its own, so every paging path has
+// to add one by hand (the offset paths do this inline because they also need an
+// offset argument). Without it the API applies its default page size of 25,
+// which for a cursor loop means hundreds of round trips for a large result set.
+func appendLimitClause(body string, n int) string {
+	if n <= 0 {
+		return body
+	}
+	if body != "" {
+		body += "&"
+	}
+	return body + fmt.Sprintf("limit(%d)", n)
+}
+
 // QueryWithCursor executes a query using cursor-based pagination.
 // This is more efficient than offset-based pagination for large result sets,
 // as it avoids the performance degradation that occurs with high offsets.
@@ -734,7 +750,7 @@ func (c *Client) QueryWithCursor(ctx context.Context, objectType string, q *Quer
 		cursorQuery.LimitValue = chunkSize
 
 		reqURL := fmt.Sprintf("%s/%s/", c.BaseURL, resolvedType)
-		body := cursorQuery.Build()
+		body := appendLimitClause(cursorQuery.Build(), chunkSize)
 
 		if c.Debug {
 			fmt.Printf("DEBUG: POST %s (cursor)\n", reqURL)
@@ -820,7 +836,7 @@ func (c *Client) StreamWithCursor(ctx context.Context, objectType string, q *Que
 			cursorQuery.LimitValue = chunkSize
 
 			reqURL := fmt.Sprintf("%s/%s/", c.BaseURL, resolvedType)
-			body := cursorQuery.Build()
+			body := appendLimitClause(cursorQuery.Build(), chunkSize)
 
 			batch, chunkInfo, err := c.doQueryRequest(ctx, reqURL, body)
 			if err != nil {
@@ -893,7 +909,7 @@ func (c *Client) QueryCallbackWithCursor(ctx context.Context, objectType string,
 		cursorQuery.LimitValue = chunkSize
 
 		reqURL := fmt.Sprintf("%s/%s/", c.BaseURL, resolvedType)
-		body := cursorQuery.Build()
+		body := appendLimitClause(cursorQuery.Build(), chunkSize)
 
 		if c.Debug {
 			fmt.Printf("DEBUG: POST %s (cursor)\n", reqURL)
