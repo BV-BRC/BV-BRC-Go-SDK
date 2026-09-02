@@ -3,8 +3,11 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -391,4 +394,104 @@ func TestClient_QueryCallbackWithCursor(t *testing.T) {
 	if totalRecords != 4 {
 		t.Errorf("totalRecords = %d, want 4", totalRecords)
 	}
+}
+
+func TestAppendLimitClause(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+		n    int
+		want string
+	}{
+		{"appends to a query", "select(genome_id)&cursor(*)", 500, "select(genome_id)&cursor(*)&limit(500)"},
+		{"empty body needs no separator", "", 500, "limit(500)"},
+		{"zero is left alone", "select(genome_id)", 0, "select(genome_id)"},
+		{"negative is left alone", "select(genome_id)", -1, "select(genome_id)"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := appendLimitClause(tt.body, tt.n); got != tt.want {
+				t.Errorf("appendLimitClause(%q, %d) = %q, want %q", tt.body, tt.n, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestCursorQueriesSendLimit guards against the cursor paths falling back to the
+// API's default page size of 25: Query.Build emits no limit clause, so each
+// cursor request must add one for the client's chunk size.
+func TestCursorQueriesSendLimit(t *testing.T) {
+	const chunkSize = 500
+
+	newServer := func(bodies *[]string) *httptest.Server {
+		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			raw, _ := io.ReadAll(r.Body)
+			*bodies = append(*bodies, string(raw))
+
+			w.Header().Set("Content-Range", "items 0-1/1")
+			w.Header().Set("X-Cursor-Mark", "*") // unchanged: signals end
+			json.NewEncoder(w).Encode([]map[string]any{{"genome_id": "1.1"}})
+		}))
+	}
+
+	check := func(t *testing.T, bodies []string) {
+		t.Helper()
+		if len(bodies) == 0 {
+			t.Fatal("server received no requests")
+		}
+		for i, body := range bodies {
+			want := fmt.Sprintf("limit(%d)", chunkSize)
+			if !strings.Contains(body, want) {
+				t.Errorf("request %d body = %q, want it to contain %q", i, body, want)
+			}
+			if !strings.Contains(body, "cursor(") {
+				t.Errorf("request %d body = %q, want it to contain a cursor clause", i, body)
+			}
+			if strings.Count(body, "limit(") != 1 {
+				t.Errorf("request %d body = %q, want exactly one limit clause", i, body)
+			}
+		}
+	}
+
+	t.Run("QueryWithCursor", func(t *testing.T) {
+		var bodies []string
+		server := newServer(&bodies)
+		defer server.Close()
+
+		c := NewClient(WithBaseURL(server.URL), WithChunkSize(chunkSize))
+		if _, err := c.QueryWithCursor(context.Background(), "genome", NewQuery().Eq("genus", "Test")); err != nil {
+			t.Fatalf("QueryWithCursor() error = %v", err)
+		}
+		check(t, bodies)
+	})
+
+	t.Run("StreamWithCursor", func(t *testing.T) {
+		var bodies []string
+		server := newServer(&bodies)
+		defer server.Close()
+
+		c := NewClient(WithBaseURL(server.URL), WithChunkSize(chunkSize))
+		records, errs := c.StreamWithCursor(context.Background(), "genome", NewQuery().Eq("genus", "Test"))
+		for range records {
+		}
+		if err := <-errs; err != nil {
+			t.Fatalf("StreamWithCursor() error = %v", err)
+		}
+		check(t, bodies)
+	})
+
+	t.Run("QueryCallbackWithCursor", func(t *testing.T) {
+		var bodies []string
+		server := newServer(&bodies)
+		defer server.Close()
+
+		c := NewClient(WithBaseURL(server.URL), WithChunkSize(chunkSize))
+		err := c.QueryCallbackWithCursor(context.Background(), "genome", NewQuery().Eq("genus", "Test"),
+			func([]map[string]any, *ChunkInfo) bool { return true })
+		if err != nil {
+			t.Fatalf("QueryCallbackWithCursor() error = %v", err)
+		}
+		check(t, bodies)
+	})
 }

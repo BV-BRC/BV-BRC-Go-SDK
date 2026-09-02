@@ -201,23 +201,42 @@ func (nopWriteCloser) Close() error {
 	return nil
 }
 
-// FormatValue formats a value for output, handling multi-valued fields.
-func FormatValue(v any, delim string) string {
+// formatScalar formats a single (non-slice) value for output.
+//
+// JSON decoding turns every numeric field into a float64, and fmt.Sprint renders
+// a float64 with %g, which switches to scientific notation once the exponent
+// reaches 6 -- so a taxon_id of 1004021 would print as "1.004021e+06" and a
+// genome_length of 5000000 as "5e+06". Format floats explicitly instead, with
+// the shortest representation that round-trips and no exponent: integral values
+// print as plain integers, fractional ones keep their fraction.
+func formatScalar(v any) string {
 	switch val := v.(type) {
 	case nil:
 		return ""
 	case string:
 		return val
+	case float64:
+		return strconv.FormatFloat(val, 'f', -1, 64)
+	case float32:
+		return strconv.FormatFloat(float64(val), 'f', -1, 32)
+	default:
+		return fmt.Sprint(v)
+	}
+}
+
+// FormatValue formats a value for output, handling multi-valued fields.
+func FormatValue(v any, delim string) string {
+	switch val := v.(type) {
 	case []any:
 		parts := make([]string, len(val))
 		for i, item := range val {
-			parts[i] = fmt.Sprint(item)
+			parts[i] = formatScalar(item)
 		}
 		return strings.Join(parts, delim)
 	case []string:
 		return strings.Join(val, delim)
 	default:
-		return fmt.Sprint(v)
+		return formatScalar(v)
 	}
 }
 
