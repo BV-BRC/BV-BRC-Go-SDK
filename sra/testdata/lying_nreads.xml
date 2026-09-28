@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"  ?>
+<EXPERIMENT_PACKAGE_SET>
+<EXPERIMENT_PACKAGE>
+  <EXPERIMENT accession="SRX62630001" alias="lying-nreads-exp">
+    <IDENTIFIERS><PRIMARY_ID>SRX62630001</PRIMARY_ID></IDENTIFIERS>
+    <TITLE>Experiment reproducing the SRR6263255-style lying nreads attribute</TITLE>
+    <STUDY_REF accession="SRP62630001"><IDENTIFIERS><PRIMARY_ID>SRP62630001</PRIMARY_ID></IDENTIFIERS></STUDY_REF>
+    <DESIGN>
+      <LIBRARY_DESCRIPTOR>
+        <LIBRARY_LAYOUT><PAIRED NOMINAL_LENGTH="300" NOMINAL_SDEV="0"/></LIBRARY_LAYOUT>
+      </LIBRARY_DESCRIPTOR>
+    </DESIGN>
+    <PLATFORM>
+      <ILLUMINA>
+        <INSTRUMENT_MODEL>Illumina HiSeq 2500</INSTRUMENT_MODEL>
+      </ILLUMINA>
+    </PLATFORM>
+  </EXPERIMENT>
+  <STUDY center_name="BioProject" alias="PRJNA6263000" accession="SRP62630001">
+    <IDENTIFIERS><PRIMARY_ID>SRP62630001</PRIMARY_ID></IDENTIFIERS>
+    <DESCRIPTOR>
+      <STUDY_TITLE>Test study for the lying-nreads regression</STUDY_TITLE>
+    </DESCRIPTOR>
+  </STUDY>
+  <RUN_SET runs="1" bases="150000000" spots="500000">
+    <!--
+      Modeled on SRR6263255 (cf sra_tools.py:142 "nreads might lie"): the
+      Statistics element's own "nreads" attribute says 1, but both Read
+      children actually carry count > 0, so the real answer is 2. The parser
+      under test must never read the "nreads" attribute directly; it must
+      derive NReads by counting children with count greater than 0.
+    -->
+    <RUN accession="SRR62630001" alias="lying-nreads-run" total_spots="500000" total_bases="150000000" size="95000000">
+      <IDENTIFIERS><PRIMARY_ID>SRR62630001</PRIMARY_ID></IDENTIFIERS>
+      <Statistics nreads="1" nspots="500000">
+        <Read index="0" count="500000" average="150" stdev="0"/>
+        <Read index="1" count="500000" average="150" stdev="0"/>
+      </Statistics>
+    </RUN>
+  </RUN_SET>
+</EXPERIMENT_PACKAGE>
+</EXPERIMENT_PACKAGE_SET>

@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -43,6 +44,8 @@ type Record struct {
 	// experiment, or a study.
 	Accession string
 	// RunAccessions lists the run accessions in the matching experiment package.
+	// Kept for backward compatibility; Runs (below) carries the same
+	// accessions plus full per-run metadata.
 	RunAccessions []string
 	// ExperimentAccession and StudyAccession identify the enclosing records.
 	ExperimentAccession string
@@ -52,6 +55,32 @@ type Record struct {
 	// StudyTitle is the study-level title. This is the value the web UI
 	// records as "title" on a submitted SRA library.
 	StudyTitle string
+	// Platform is NCBI's raw PLATFORM tag name (e.g. "ILLUMINA",
+	// "PACBIO_SMRT"), taken from the tag itself rather than element content
+	// -- see sra_tools.py:87-93 (plat.tag). Empty if the experiment package
+	// carries no PLATFORM element.
+	Platform string
+	// LibraryLayout is "PAIRED" or "SINGLE", derived from the presence of
+	// LIBRARY_LAYOUT/PAIRED or LIBRARY_LAYOUT/SINGLE -- see sra_tools.py:108.
+	LibraryLayout string
+	// Runs carries full per-run metadata for every run in the matching
+	// experiment package, in RUN_SET order (same order as RunAccessions).
+	Runs []RunRecord
+}
+
+// RunRecord is per-run metadata parsed out of one RUN_SET/RUN element.
+type RunRecord struct {
+	Accession  string
+	SizeBytes  int64
+	TotalBases int64
+	TotalSpots int64
+	// NReads is the number of reads eutils' own Statistics block actually
+	// evidences (see parseRunRecord) rather than a trusted @nreads
+	// attribute. Zero means unknown, not "zero reads".
+	NReads int
+	// ReadLength is the average read length reported by the first
+	// Statistics child that carries one. Zero means unknown.
+	ReadLength float64
 }
 
 // Client queries NCBI for SRA metadata.
@@ -106,8 +135,48 @@ func New(opts ...Option) *Client {
 // condition from an accession not existing, and callers generally want to treat
 // it differently: an unknown accession is the user's mistake, an eutils outage
 // is not.
+//
+// Lookup is a thin first-match wrapper over LookupAll: for a study (SRP) or
+// experiment (SRX) accession that spans multiple experiment packages, this
+// returns only the first one, matching this method's behavior before
+// LookupAll existed (so nothing depending on that — e.g. --validate-srr —
+// changes). Callers that need every constituent run of a study should call
+// LookupAll directly.
 func (c *Client) Lookup(ctx context.Context, accessions []string) (found map[string]Record, missing []string, err error) {
-	found = make(map[string]Record)
+	all, missing, err := c.LookupAll(ctx, accessions)
+	if err != nil {
+		return nil, nil, err
+	}
+	found = make(map[string]Record, len(all))
+	for a, recs := range all {
+		found[a] = recs[0] // first match; recs is never empty (see LookupAll).
+	}
+	return found, missing, nil
+}
+
+// LookupAll fetches metadata for every accession, like Lookup, but returns
+// every matching experiment package rather than just the first.
+//
+// This matters for a study (SRP) accession: every experiment package in the
+// study matches it, but Lookup — a linear scan that returns on the first hit
+// — only ever reported one. get_metadata-style callers need one row per
+// constituent run across the whole study, matching sra_tools.py's
+// parse_accession_metadata, which already flattens a study/experiment
+// accession into one record per run.
+//
+// found is keyed by the accession as requested, to a slice of Record (one per
+// matching experiment package, in the order NCBI returned them); missing
+// lists, in the order given, the accessions NCBI did not return at all.
+func (c *Client) LookupAll(ctx context.Context, accessions []string) (found map[string][]Record, missing []string, err error) {
+	return c.collectMatches(ctx, accessions, matchAllAccessions)
+}
+
+// collectMatches implements the batching/dedup/fetch flow shared by Lookup
+// and LookupAll, so both reuse this package's HTTP/retry logic (fetch/get)
+// rather than duplicating it. match is called once per requested accession
+// against the packages retrieved for its batch.
+func (c *Client) collectMatches(ctx context.Context, accessions []string, match func(accession string, packages []experimentPackage) ([]Record, bool)) (found map[string][]Record, missing []string, err error) {
+	found = make(map[string][]Record)
 
 	var want []string
 	seen := make(map[string]bool, len(accessions))
@@ -138,8 +207,8 @@ func (c *Client) Lookup(ctx context.Context, accessions []string) (found map[str
 			return nil, nil, err
 		}
 		for _, a := range batch {
-			if rec, ok := matchAccession(a, packages); ok {
-				found[a] = rec
+			if recs, ok := match(a, packages); ok {
+				found[a] = recs
 			}
 		}
 	}
@@ -152,37 +221,134 @@ func (c *Client) Lookup(ctx context.Context, accessions []string) (found map[str
 	return found, missing, nil
 }
 
-// matchAccession finds the experiment package covering the accession. An
-// accession may name a run, an experiment, or a study; sra_tools.py accepts all
-// three (parse_accession_metadata), so we do too.
+// packageMatches reports whether accession names p's experiment, its study,
+// or one of its runs. An accession may name a run, an experiment, or a study;
+// sra_tools.py accepts all three (parse_accession_metadata), so we do too.
+func packageMatches(accession string, p experimentPackage) bool {
+	if strings.EqualFold(accession, p.Experiment.Accession) ||
+		strings.EqualFold(accession, p.Study.Accession) {
+		return true
+	}
+	for _, r := range p.RunSet.Runs {
+		if strings.EqualFold(accession, r.Accession) {
+			return true
+		}
+	}
+	return false
+}
+
+// recordFromPackage builds a Record for accession out of one matching
+// experiment package.
+func recordFromPackage(accession string, p experimentPackage) Record {
+	rec := Record{
+		Accession:           accession,
+		ExperimentAccession: p.Experiment.Accession,
+		StudyAccession:      p.Study.Accession,
+		ExperimentTitle:     strings.TrimSpace(p.Experiment.Title),
+		StudyTitle:          strings.TrimSpace(p.Study.Descriptor.StudyTitle),
+		Platform:            platformOf(p.Experiment.Platform),
+		LibraryLayout:       libraryLayoutOf(p.Experiment.LibraryLayout),
+	}
+	for _, r := range p.RunSet.Runs {
+		rec.RunAccessions = append(rec.RunAccessions, r.Accession)
+		rec.Runs = append(rec.Runs, parseRunRecord(r))
+	}
+	return rec
+}
+
+// matchAccession finds the first experiment package covering the accession.
+// Kept for Lookup's first-match behavior; LookupAll uses matchAllAccessions
+// instead.
 func matchAccession(accession string, packages []experimentPackage) (Record, bool) {
 	for _, p := range packages {
-		hit := strings.EqualFold(accession, p.Experiment.Accession) ||
-			strings.EqualFold(accession, p.Study.Accession)
-		if !hit {
-			for _, r := range p.RunSet.Runs {
-				if strings.EqualFold(accession, r.Accession) {
-					hit = true
-					break
+		if packageMatches(accession, p) {
+			return recordFromPackage(accession, p), true
+		}
+	}
+	return Record{}, false
+}
+
+// matchAllAccessions finds every experiment package covering the accession.
+func matchAllAccessions(accession string, packages []experimentPackage) ([]Record, bool) {
+	var recs []Record
+	for _, p := range packages {
+		if packageMatches(accession, p) {
+			recs = append(recs, recordFromPackage(accession, p))
+		}
+	}
+	return recs, len(recs) > 0
+}
+
+// platformOf returns the PLATFORM element's child tag name (e.g. "ILLUMINA"),
+// or "" if there is none.
+func platformOf(p platformXML) string {
+	if len(p.Any) == 0 {
+		return ""
+	}
+	return p.Any[0].XMLName.Local
+}
+
+// libraryLayoutOf classifies a LIBRARY_LAYOUT element by which child is
+// present. sra_tools.py:108 only ever tests for PAIRED and defaults to SINGLE
+// otherwise ("this might be unreliable. use the existence of paired file");
+// this instead tests both children explicitly (matching real SRA documents,
+// which always carry exactly one of PAIRED/SINGLE/... per the SRA schema) and
+// returns "" only in the pathological case where neither is present —
+// slightly stricter than the Python fallback, which would call that case
+// SINGLE.
+func libraryLayoutOf(l libraryLayoutXML) string {
+	switch {
+	case l.Paired != nil:
+		return "PAIRED"
+	case l.Single != nil:
+		return "SINGLE"
+	default:
+		return ""
+	}
+}
+
+// parseRunRecord builds a RunRecord from one RUN element.
+//
+// The NReads/ReadLength logic ports sra_tools.py:144-153 exactly: nreads
+// might lie (cf SRR6263255), so this counts Statistics children whose own
+// "count" attribute is > 0 rather than trusting a naive @nreads summary
+// attribute (which this doesn't even read). The same loop also ports that
+// block's ReadLength fallback: the first Statistics child carrying an
+// "average" attribute sets ReadLength, matching Python's
+// "not 'read_length' in rdata" first-wins guard.
+func parseRunRecord(r runXML) RunRecord {
+	rec := RunRecord{Accession: r.Accession}
+	if v, err := strconv.ParseInt(r.TotalBases, 10, 64); err == nil {
+		rec.TotalBases = v
+	}
+	if v, err := strconv.ParseInt(r.TotalSpots, 10, 64); err == nil {
+		rec.TotalSpots = v
+	}
+	if v, err := strconv.ParseInt(r.Size, 10, 64); err == nil {
+		rec.SizeBytes = v
+	}
+
+	if r.Statistics != nil {
+		// nreads might lie. cf SRR6263255
+		nreads := 0
+		readLengthSet := false
+		for _, read := range r.Statistics.Reads {
+			if count, err := strconv.Atoi(read.Count); err == nil && count > 0 {
+				nreads++
+			}
+			if !readLengthSet && read.Average != "" {
+				if avg, err := strconv.ParseFloat(read.Average, 64); err == nil {
+					rec.ReadLength = avg
+					readLengthSet = true
 				}
 			}
 		}
-		if !hit {
-			continue
+		if nreads > 0 {
+			rec.NReads = nreads
 		}
-		rec := Record{
-			Accession:           accession,
-			ExperimentAccession: p.Experiment.Accession,
-			StudyAccession:      p.Study.Accession,
-			ExperimentTitle:     strings.TrimSpace(p.Experiment.Title),
-			StudyTitle:          strings.TrimSpace(p.Study.Descriptor.StudyTitle),
-		}
-		for _, r := range p.RunSet.Runs {
-			rec.RunAccessions = append(rec.RunAccessions, r.Accession)
-		}
-		return rec, true
 	}
-	return Record{}, false
+
+	return rec
 }
 
 // fetch performs one efetch request and returns the experiment packages it
@@ -285,6 +451,15 @@ type experimentPackage struct {
 	Experiment struct {
 		Accession string `xml:"accession,attr"`
 		Title     string `xml:"TITLE"`
+		// Platform's value is the tag name of PLATFORM's one child element
+		// (e.g. <ILLUMINA>...</ILLUMINA>), not its content -- see
+		// sra_tools.py:87-93.
+		Platform platformXML `xml:"PLATFORM"`
+		// LibraryLayout lives at EXPERIMENT/DESIGN/LIBRARY_DESCRIPTOR/
+		// LIBRARY_LAYOUT per the SRA schema; sra_tools.py:108 finds it with a
+		// "//" wildcard search instead, but every real document places it
+		// here.
+		LibraryLayout libraryLayoutXML `xml:"DESIGN>LIBRARY_DESCRIPTOR>LIBRARY_LAYOUT"`
 	} `xml:"EXPERIMENT"`
 	Study struct {
 		Accession  string `xml:"accession,attr"`
@@ -293,8 +468,47 @@ type experimentPackage struct {
 		} `xml:"DESCRIPTOR"`
 	} `xml:"STUDY"`
 	RunSet struct {
-		Runs []struct {
-			Accession string `xml:"accession,attr"`
-		} `xml:"RUN"`
+		Runs []runXML `xml:"RUN"`
 	} `xml:"RUN_SET"`
+}
+
+// platformXML captures EXPERIMENT/PLATFORM's one child element so its tag
+// name (not its content) can be read as the platform. xml:",any" collects
+// every child regardless of name; the SRA schema only ever has one.
+type platformXML struct {
+	Any []struct {
+		XMLName xml.Name
+	} `xml:",any"`
+}
+
+// libraryLayoutXML is a pair of presence probes, not content fields: a
+// non-nil pointer means the element was present (its content, if any, is
+// ignored), matching sra_tools.py:108's existence-only check.
+type libraryLayoutXML struct {
+	Paired *struct{} `xml:"PAIRED"`
+	Single *struct{} `xml:"SINGLE"`
+}
+
+// runXML is one RUN_SET/RUN element. Numeric attributes are kept as strings
+// and parsed in parseRunRecord because they are sometimes absent (see
+// sra_tools.py's try/except around the same reads) -- an unparseable or
+// missing value just leaves the corresponding RunRecord field zero rather
+// than failing the whole unmarshal.
+type runXML struct {
+	Accession  string         `xml:"accession,attr"`
+	TotalBases string         `xml:"total_bases,attr"`
+	TotalSpots string         `xml:"total_spots,attr"`
+	Size       string         `xml:"size,attr"`
+	Statistics *statisticsXML `xml:"Statistics"`
+}
+
+// statisticsXML mirrors the RUN/Statistics block eutils emits: a summary
+// element (whose own "nreads" attribute we deliberately never read -- see
+// parseRunRecord) with one child per read, each carrying its own "count" and
+// "average" attributes.
+type statisticsXML struct {
+	Reads []struct {
+		Count   string `xml:"count,attr"`
+		Average string `xml:"average,attr"`
+	} `xml:",any"`
 }
