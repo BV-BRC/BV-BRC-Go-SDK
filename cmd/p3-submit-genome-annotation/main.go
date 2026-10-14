@@ -40,6 +40,8 @@ var (
 	domain                string
 	lowvanMinContigLength int
 	lowvanMaxContigLength int
+	lowvanMinContigBit    float64
+	lowvanFallbackTaxon   bool
 	workflowFile          string
 	importOnly            bool
 	rawImportOnly         bool
@@ -88,6 +90,8 @@ func init() {
 	rootCmd.Flags().StringVarP(&domain, "domain", "d", "", "domain (Bacteria or Archaea)")
 	rootCmd.Flags().IntVar(&lowvanMinContigLength, "lowvan-min-contig-length", 0, "minimum contig length for the lowvan viral annotation pipeline (default 300)")
 	rootCmd.Flags().IntVar(&lowvanMaxContigLength, "lowvan-max-contig-length", 0, "maximum contig length for the lowvan viral annotation pipeline (default 40000)")
+	rootCmd.Flags().Float64Var(&lowvanMinContigBit, "lowvan-min-contig-bit", 0, "minimum BLASTn bit score for the lowvan viral annotation pipeline to accept a taxon call (default 150)")
+	rootCmd.Flags().BoolVar(&lowvanFallbackTaxon, "lowvan-fallback-viral-taxon", false, "if the lowvan classification finds no reference above the minimum bit score, retry using the annotation taxon taken from the genome's own lineage")
 	rootCmd.Flags().StringVar(&workflowFile, "workflow-file", "", "custom workflow document")
 	rootCmd.Flags().BoolVar(&importOnly, "import-only", false, "import without reannotation")
 	rootCmd.Flags().BoolVar(&rawImportOnly, "raw-import-only", false, "raw import without processing")
@@ -217,14 +221,21 @@ func run(cmd *cobra.Command, args []string) error {
 	if referenceVirus != "" {
 		params["reference_virus_name"] = referenceVirus
 	}
-	// lowvan contig-length bounds apply to both the GenomeAnnotation (contigs)
-	// and GenomeAnnotationGenbank specs. Send only when explicitly set, so the
+	// lowvan options apply to both the GenomeAnnotation (contigs) and
+	// GenomeAnnotationGenbank specs. Send only when explicitly set, so the
 	// service applies its own defaults otherwise (mirrors Perl defined() check).
 	if cmd.Flags().Changed("lowvan-min-contig-length") {
 		params["lowvan_min_contig_length"] = lowvanMinContigLength
 	}
 	if cmd.Flags().Changed("lowvan-max-contig-length") {
 		params["lowvan_max_contig_length"] = lowvanMaxContigLength
+	}
+	if cmd.Flags().Changed("lowvan-min-contig-bit") {
+		params["lowvan_min_contig_bit"] = lowvanMinContigBit
+	}
+	// Perl emits this one only when true, and as 1 rather than a JSON bool.
+	if lowvanFallbackTaxon {
+		params["lowvan_fallback_viral_taxon"] = 1
 	}
 
 	if inputMode == "genbank" {
