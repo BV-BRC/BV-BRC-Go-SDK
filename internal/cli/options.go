@@ -55,7 +55,10 @@ type DataOptions struct {
 	// Debug enables debug output
 	Debug bool
 
-	// Cursor enables cursor-based pagination (more efficient for large result sets)
+	// Cursor is accepted and ignored: pagination is always cursor-based.
+	//
+	// Deprecated: kept so existing scripts and pipelines keep working. Nothing
+	// reads it.
 	Cursor bool
 
 	// APIURL overrides the default API URL
@@ -107,8 +110,12 @@ func AddDataFlags(cmd *cobra.Command, opts *DataOptions) {
 		"maximum number of records to return")
 	flags.BoolVar(&opts.Debug, "debug", false,
 		"enable debug output")
+	// --cursor is a no-op: every query pages by cursor now. Hidden rather than
+	// removed so the scripts and pipelines that already pass it keep running;
+	// MarkDeprecated also makes cobra print a notice when it is used.
 	flags.BoolVar(&opts.Cursor, "cursor", false,
-		"use cursor-based pagination (more efficient for large result sets)")
+		"deprecated: pagination is always cursor-based")
+	_ = flags.MarkDeprecated("cursor", "pagination is always cursor-based; the flag does nothing")
 	flags.StringVar(&opts.APIURL, "api-url", "",
 		"override API URL (default: https://www.bv-brc.org/api)")
 	flags.IntVar(&opts.MaxRetries, "max-retries", 0,

@@ -21,9 +21,9 @@ const (
 
 // Filter represents a query filter condition.
 type Filter struct {
-	Op    FilterOp
-	Field string
-	Value string   // For single-value operators
+	Op     FilterOp
+	Field  string
+	Value  string   // For single-value operators
 	Values []string // For multi-value operators (in)
 }
 
@@ -200,9 +200,16 @@ func (q *Query) Build() string {
 		parts = append(parts, fmt.Sprintf("sort(%s)", strings.Join(sortFields, ",")))
 	}
 
-	// Add cursor
+	// Add cursor.
+	//
+	// The mark is base64 and the API percent-decodes the request body (a mark
+	// sent as %2F...%3D returns the same row as the raw form), so encode it.
+	// Raw happens to work today -- a literal '+' reaches Solr intact rather
+	// than being read as a space -- but that depends on a decoder rule we do
+	// not control, and a mark containing '+' would break silently if it ever
+	// changed. QueryEscape maps '*' to %2A, which the API accepts identically.
 	if q.CursorMark != "" {
-		parts = append(parts, fmt.Sprintf("cursor(%s)", q.CursorMark))
+		parts = append(parts, fmt.Sprintf("cursor(%s)", url.QueryEscape(q.CursorMark)))
 	}
 
 	return strings.Join(parts, "&")

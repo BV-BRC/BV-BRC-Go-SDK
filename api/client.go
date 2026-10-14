@@ -149,12 +149,22 @@ func NewClient(opts ...ClientOption) *Client {
 	return c
 }
 
-// Query executes a query against the specified object type and returns the results.
-// It handles automatic pagination to fetch all matching records.
-func (c *Client) Query(ctx context.Context, objectType string, q *Query) ([]map[string]any, error) {
-	var allResults []map[string]any
+// cursorPages walks a query with Solr's cursorMark, handing each page to fn.
+// Returning false from fn stops the walk. It is the single pagination path
+// behind Query, QueryCallback and Stream.
+//
+// Cursor is the only mode this client offers. Offset paging (start=N&rows=M)
+// makes every shard collect and rank N+M documents and the aggregator merge
+// them -- work proportional to the offset, repeated per page and thrown away,
+// paid by the shared Solr tier rather than by the client that asked for it. A
+// single page at offset 1,000,000 against genome_feature measured 96.7s
+// (QTime 96,573ms) where a cursor page of the same size takes ~5s at any
+// depth. It is also the more correct mechanism: without a total order Solr's
+// ranking of equal documents across shards is not stable between requests, so
+// offset paging can repeat or skip rows even on a static index.
+func (c *Client) cursorPages(ctx context.Context, objectType string, q *Query,
+	fn func([]map[string]any, *ChunkInfo) bool) error {
 
-	// Resolve object type alias
 	resolvedType := GetObjectType(objectType)
 
 	// Ensure query has at least one filter (BV-BRC API requirement)
@@ -168,8 +178,8 @@ func (c *Client) Query(ctx context.Context, objectType string, q *Query) ([]map[
 		q.Eq(idCol, "*")
 	}
 
-	// Build query string
-	queryStr := q.Build()
+	// Clone for cursor manipulation so the caller's query is left alone.
+	cursorQuery := q.Clone()
 
 	// Determine chunk size
 	chunkSize := c.ChunkSize
@@ -177,57 +187,78 @@ func (c *Client) Query(ctx context.Context, objectType string, q *Query) ([]map[
 		chunkSize = q.LimitValue
 	}
 
-	offset := 0
+	// A caller may supply a mark to resume from; "*" starts at the beginning.
+	cursorMark := q.CursorMark
+	if cursorMark == "" {
+		cursorMark = "*"
+	}
+
+	reqURL := fmt.Sprintf("%s/%s/", c.BaseURL, resolvedType)
+	totalFetched := 0
+
 	for {
 		select {
 		case <-ctx.Done():
-			return nil, ctx.Err()
+			return ctx.Err()
 		default:
 		}
 
-		// Build request URL
-		reqURL := fmt.Sprintf("%s/%s/", c.BaseURL, resolvedType)
-
-		// Build request body with limit
-		body := queryStr
-		if body != "" {
-			body += "&"
-		}
-		if offset > 0 {
-			body += fmt.Sprintf("limit(%d,%d)", chunkSize, offset)
-		} else {
-			body += fmt.Sprintf("limit(%d)", chunkSize)
-		}
+		cursorQuery.CursorMark = cursorMark
+		body := appendLimitClause(cursorQuery.Build(), chunkSize)
 
 		if c.Debug {
-			fmt.Printf("DEBUG: POST %s\n", reqURL)
+			fmt.Printf("DEBUG: POST %s (cursor)\n", reqURL)
 			fmt.Printf("DEBUG: Body: %s\n", body)
 		}
 
-		// Execute request with retries
 		results, chunkInfo, err := c.doQueryRequest(ctx, reqURL, body)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
-		allResults = append(allResults, results...)
+		// Trim results if we would exceed the limit
+		if q.LimitValue > 0 && totalFetched+len(results) > q.LimitValue {
+			results = results[:q.LimitValue-totalFetched]
+		}
+		totalFetched += len(results)
 
-		// Check if we have all results
-		if chunkInfo.IsLast || len(results) < chunkSize {
-			break
+		if !fn(results, chunkInfo) {
+			return nil
+		}
+
+		// End conditions:
+		// 1. No cursor returned
+		// 2. Cursor unchanged (Solr's signal that this was the last page)
+		// 3. No results returned
+		if chunkInfo.CursorMark == "" ||
+			chunkInfo.CursorMark == cursorMark ||
+			len(results) == 0 {
+			return nil
 		}
 
 		// Check if we've reached the requested limit
-		if q.LimitValue > 0 && len(allResults) >= q.LimitValue {
-			break
+		if q.LimitValue > 0 && totalFetched >= q.LimitValue {
+			return nil
 		}
 
-		offset = chunkInfo.Next
+		cursorMark = chunkInfo.CursorMark
 	}
+}
 
-	// Trim to requested limit if specified
-	if q.LimitValue > 0 && len(allResults) > q.LimitValue {
-		allResults = allResults[:q.LimitValue]
+// Query executes a query against the specified object type and returns the results.
+// It handles automatic pagination to fetch all matching records.
+//
+// Note this buffers the entire result set. For a large one prefer
+// QueryCallback or Stream, which hand back a page at a time.
+func (c *Client) Query(ctx context.Context, objectType string, q *Query) ([]map[string]any, error) {
+	var allResults []map[string]any
+
+	err := c.cursorPages(ctx, objectType, q, func(results []map[string]any, _ *ChunkInfo) bool {
+		allResults = append(allResults, results...)
+		return true
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return allResults, nil
@@ -365,71 +396,19 @@ func (c *Client) Stream(ctx context.Context, objectType string, q *Query) (<-cha
 		defer close(results)
 		defer close(errs)
 
-		resolvedType := GetObjectType(objectType)
-
-		// Ensure query has at least one filter (BV-BRC API requirement)
-		if !q.HasFilters() {
-			idCol := GetIDColumn(resolvedType)
-			if idCol == "" {
-				idCol = "id"
-			}
-			q = q.Clone()
-			q.Eq(idCol, "*")
-		}
-
-		queryStr := q.Build()
-
-		chunkSize := c.ChunkSize
-		if q.LimitValue > 0 && q.LimitValue < chunkSize {
-			chunkSize = q.LimitValue
-		}
-
-		offset := 0
-		totalSent := 0
-
-		for {
-			select {
-			case <-ctx.Done():
-				errs <- ctx.Err()
-				return
-			default:
-			}
-
-			reqURL := fmt.Sprintf("%s/%s/", c.BaseURL, resolvedType)
-			body := queryStr
-			if body != "" {
-				body += "&"
-			}
-			if offset > 0 {
-				body += fmt.Sprintf("limit(%d,%d)", chunkSize, offset)
-			} else {
-				body += fmt.Sprintf("limit(%d)", chunkSize)
-			}
-
-			batch, chunkInfo, err := c.doQueryRequest(ctx, reqURL, body)
-			if err != nil {
-				errs <- err
-				return
-			}
-
+		err := c.cursorPages(ctx, objectType, q, func(batch []map[string]any, _ *ChunkInfo) bool {
 			for _, record := range batch {
-				if q.LimitValue > 0 && totalSent >= q.LimitValue {
-					return
-				}
 				select {
 				case results <- record:
-					totalSent++
 				case <-ctx.Done():
 					errs <- ctx.Err()
-					return
+					return false
 				}
 			}
-
-			if chunkInfo.IsLast || len(batch) < chunkSize {
-				return
-			}
-
-			offset = chunkInfo.Next
+			return true
+		})
+		if err != nil {
+			errs <- err
 		}
 	}()
 
@@ -614,89 +593,19 @@ func (c *Client) GetSchema(ctx context.Context, objectType string) ([]FieldInfo,
 
 // QueryCallback executes a query and calls the callback function with each batch of results.
 // The callback receives the records and chunk information. Return false to stop fetching.
+//
+// The ChunkInfo passed to the callback carries the CursorMark for the *next*
+// page, delivered once the current page's records have been handed over -- so
+// a caller that wants to checkpoint its progress can record it there.
 func (c *Client) QueryCallback(ctx context.Context, objectType string, q *Query, callback func([]map[string]any, *ChunkInfo) bool) error {
-	resolvedType := GetObjectType(objectType)
-
-	// Ensure query has at least one filter (BV-BRC API requirement)
-	if !q.HasFilters() {
-		idCol := GetIDColumn(resolvedType)
-		if idCol == "" {
-			idCol = "id"
-		}
-		q = q.Clone()
-		q.Eq(idCol, "*")
-	}
-
-	queryStr := q.Build()
-
-	chunkSize := c.ChunkSize
-	if q.LimitValue > 0 && q.LimitValue < chunkSize {
-		chunkSize = q.LimitValue
-	}
-
-	offset := 0
-	totalFetched := 0
-
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-
-		reqURL := fmt.Sprintf("%s/%s/", c.BaseURL, resolvedType)
-		body := queryStr
-		if body != "" {
-			body += "&"
-		}
-		if offset > 0 {
-			body += fmt.Sprintf("limit(%d,%d)", chunkSize, offset)
-		} else {
-			body += fmt.Sprintf("limit(%d)", chunkSize)
-		}
-
-		if c.Debug {
-			fmt.Printf("DEBUG: POST %s\n", reqURL)
-			fmt.Printf("DEBUG: Body: %s\n", body)
-		}
-
-		results, chunkInfo, err := c.doQueryRequest(ctx, reqURL, body)
-		if err != nil {
-			return err
-		}
-
-		// Trim results if we would exceed the limit
-		if q.LimitValue > 0 && totalFetched+len(results) > q.LimitValue {
-			results = results[:q.LimitValue-totalFetched]
-		}
-
-		totalFetched += len(results)
-
-		// Call the callback
-		if !callback(results, chunkInfo) {
-			return nil
-		}
-
-		// Check if we have all results
-		if chunkInfo.IsLast || len(results) < chunkSize {
-			return nil
-		}
-
-		// Check if we've reached the requested limit
-		if q.LimitValue > 0 && totalFetched >= q.LimitValue {
-			return nil
-		}
-
-		offset = chunkInfo.Next
-	}
+	return c.cursorPages(ctx, objectType, q, callback)
 }
 
 // appendLimitClause appends a limit(n) clause to an already-built query body.
 //
-// Query.Build does not emit a limit clause of its own, so every paging path has
-// to add one by hand (the offset paths do this inline because they also need an
-// offset argument). Without it the API applies its default page size of 25,
-// which for a cursor loop means hundreds of round trips for a large result set.
+// Query.Build does not emit a limit clause of its own, so the cursor loop has
+// to add one by hand. Without it the API applies its default page size of 25,
+// which means hundreds of round trips for a large result set.
 func appendLimitClause(body string, n int) string {
 	if n <= 0 {
 		return body
@@ -708,243 +617,24 @@ func appendLimitClause(body string, n int) string {
 }
 
 // QueryWithCursor executes a query using cursor-based pagination.
-// This is more efficient than offset-based pagination for large result sets,
-// as it avoids the performance degradation that occurs with high offsets.
-// The API must support cursor-based pagination (available on alpha.bv-brc.org).
+//
+// Deprecated: pagination is always cursor-based now; call Query. Kept so
+// existing callers keep compiling.
 func (c *Client) QueryWithCursor(ctx context.Context, objectType string, q *Query) ([]map[string]any, error) {
-	var allResults []map[string]any
-
-	resolvedType := GetObjectType(objectType)
-
-	// Ensure query has at least one filter (BV-BRC API requirement)
-	if !q.HasFilters() {
-		idCol := GetIDColumn(resolvedType)
-		if idCol == "" {
-			idCol = "id"
-		}
-		q = q.Clone()
-		q.Eq(idCol, "*")
-	}
-
-	// Clone query for cursor manipulation
-	cursorQuery := q.Clone()
-
-	// Determine chunk size
-	chunkSize := c.ChunkSize
-	if q.LimitValue > 0 && q.LimitValue < chunkSize {
-		chunkSize = q.LimitValue
-	}
-
-	// Start with initial cursor
-	cursorMark := "*"
-
-	for {
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		default:
-		}
-
-		// Build query with current cursor
-		cursorQuery.CursorMark = cursorMark
-		cursorQuery.LimitValue = chunkSize
-
-		reqURL := fmt.Sprintf("%s/%s/", c.BaseURL, resolvedType)
-		body := appendLimitClause(cursorQuery.Build(), chunkSize)
-
-		if c.Debug {
-			fmt.Printf("DEBUG: POST %s (cursor)\n", reqURL)
-			fmt.Printf("DEBUG: Body: %s\n", body)
-		}
-
-		// Execute request
-		results, chunkInfo, err := c.doQueryRequest(ctx, reqURL, body)
-		if err != nil {
-			return nil, err
-		}
-
-		allResults = append(allResults, results...)
-
-		// End conditions:
-		// 1. No cursor returned
-		// 2. Cursor unchanged (end of results)
-		// 3. No results returned
-		if chunkInfo.CursorMark == "" ||
-			chunkInfo.CursorMark == cursorMark ||
-			len(results) == 0 {
-			break
-		}
-
-		// Check if we've reached the requested limit
-		if q.LimitValue > 0 && len(allResults) >= q.LimitValue {
-			break
-		}
-
-		cursorMark = chunkInfo.CursorMark
-	}
-
-	// Trim to requested limit if specified
-	if q.LimitValue > 0 && len(allResults) > q.LimitValue {
-		allResults = allResults[:q.LimitValue]
-	}
-
-	return allResults, nil
+	return c.Query(ctx, objectType, q)
 }
 
 // StreamWithCursor returns results via channels using cursor-based pagination.
-// This is more efficient than offset-based pagination for large result sets.
+//
+// Deprecated: pagination is always cursor-based now; call Stream.
 func (c *Client) StreamWithCursor(ctx context.Context, objectType string, q *Query) (<-chan map[string]any, <-chan error) {
-	results := make(chan map[string]any, 100)
-	errs := make(chan error, 1)
-
-	go func() {
-		defer close(results)
-		defer close(errs)
-
-		resolvedType := GetObjectType(objectType)
-
-		// Ensure query has at least one filter (BV-BRC API requirement)
-		if !q.HasFilters() {
-			idCol := GetIDColumn(resolvedType)
-			if idCol == "" {
-				idCol = "id"
-			}
-			q = q.Clone()
-			q.Eq(idCol, "*")
-		}
-
-		// Clone query for cursor manipulation
-		cursorQuery := q.Clone()
-
-		chunkSize := c.ChunkSize
-		if q.LimitValue > 0 && q.LimitValue < chunkSize {
-			chunkSize = q.LimitValue
-		}
-
-		cursorMark := "*"
-		totalSent := 0
-
-		for {
-			select {
-			case <-ctx.Done():
-				errs <- ctx.Err()
-				return
-			default:
-			}
-
-			cursorQuery.CursorMark = cursorMark
-			cursorQuery.LimitValue = chunkSize
-
-			reqURL := fmt.Sprintf("%s/%s/", c.BaseURL, resolvedType)
-			body := appendLimitClause(cursorQuery.Build(), chunkSize)
-
-			batch, chunkInfo, err := c.doQueryRequest(ctx, reqURL, body)
-			if err != nil {
-				errs <- err
-				return
-			}
-
-			for _, record := range batch {
-				if q.LimitValue > 0 && totalSent >= q.LimitValue {
-					return
-				}
-				select {
-				case results <- record:
-					totalSent++
-				case <-ctx.Done():
-					errs <- ctx.Err()
-					return
-				}
-			}
-
-			// End conditions
-			if chunkInfo.CursorMark == "" ||
-				chunkInfo.CursorMark == cursorMark ||
-				len(batch) == 0 {
-				return
-			}
-
-			cursorMark = chunkInfo.CursorMark
-		}
-	}()
-
-	return results, errs
+	return c.Stream(ctx, objectType, q)
 }
 
-// QueryCallbackWithCursor executes a query using cursor-based pagination and calls
-// the callback function with each batch of results.
-// The callback receives the records and chunk information. Return false to stop fetching.
+// QueryCallbackWithCursor executes a query using cursor-based pagination,
+// calling the callback with each page.
+//
+// Deprecated: pagination is always cursor-based now; call QueryCallback.
 func (c *Client) QueryCallbackWithCursor(ctx context.Context, objectType string, q *Query, callback func([]map[string]any, *ChunkInfo) bool) error {
-	resolvedType := GetObjectType(objectType)
-
-	// Ensure query has at least one filter (BV-BRC API requirement)
-	if !q.HasFilters() {
-		idCol := GetIDColumn(resolvedType)
-		if idCol == "" {
-			idCol = "id"
-		}
-		q = q.Clone()
-		q.Eq(idCol, "*")
-	}
-
-	// Clone query for cursor manipulation
-	cursorQuery := q.Clone()
-
-	chunkSize := c.ChunkSize
-	if q.LimitValue > 0 && q.LimitValue < chunkSize {
-		chunkSize = q.LimitValue
-	}
-
-	cursorMark := "*"
-	totalFetched := 0
-
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-
-		cursorQuery.CursorMark = cursorMark
-		cursorQuery.LimitValue = chunkSize
-
-		reqURL := fmt.Sprintf("%s/%s/", c.BaseURL, resolvedType)
-		body := appendLimitClause(cursorQuery.Build(), chunkSize)
-
-		if c.Debug {
-			fmt.Printf("DEBUG: POST %s (cursor)\n", reqURL)
-			fmt.Printf("DEBUG: Body: %s\n", body)
-		}
-
-		results, chunkInfo, err := c.doQueryRequest(ctx, reqURL, body)
-		if err != nil {
-			return err
-		}
-
-		// Trim results if we would exceed the limit
-		if q.LimitValue > 0 && totalFetched+len(results) > q.LimitValue {
-			results = results[:q.LimitValue-totalFetched]
-		}
-
-		totalFetched += len(results)
-
-		// Call the callback
-		if !callback(results, chunkInfo) {
-			return nil
-		}
-
-		// End conditions
-		if chunkInfo.CursorMark == "" ||
-			chunkInfo.CursorMark == cursorMark ||
-			len(results) == 0 {
-			return nil
-		}
-
-		// Check if we've reached the requested limit
-		if q.LimitValue > 0 && totalFetched >= q.LimitValue {
-			return nil
-		}
-
-		cursorMark = chunkInfo.CursorMark
-	}
+	return c.QueryCallback(ctx, objectType, q, callback)
 }

@@ -41,7 +41,6 @@ import (
 	"io"
 	"os"
 	"sort"
-	"strings"
 
 	"github.com/BV-BRC/BV-BRC-Go-SDK/api"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/auth"
@@ -324,44 +323,23 @@ func run(cmd *cobra.Command, args []string) error {
 				inputRowList := rowsByKey[key]
 
 				var queryErr error
-				if dataOpts.Cursor {
-					queryErr = client.QueryCallbackWithCursor(ctx, "genome", query, func(records []map[string]any, info *api.ChunkInfo) bool {
-						for _, record := range records {
-							for _, inputRow := range inputRowList {
-								var outRow []string
-								outRow = append(outRow, inputRow...)
-								for _, f := range fields {
-									outRow = append(outRow, cli.FormatValue(record[f], delim))
-								}
-								if err := writer.WriteRow(outRow...); err != nil {
-									fmt.Fprintf(os.Stderr, "Error writing row: %v\n", err)
-									return false
-								}
+				queryErr = client.QueryCallback(ctx, "genome", query, func(records []map[string]any, info *api.ChunkInfo) bool {
+					for _, record := range records {
+						for _, inputRow := range inputRowList {
+							var outRow []string
+							outRow = append(outRow, inputRow...)
+							for _, f := range fields {
+								outRow = append(outRow, cli.FormatValue(record[f], delim))
+							}
+							if err := writer.WriteRow(outRow...); err != nil {
+								fmt.Fprintf(os.Stderr, "Error writing row: %v\n", err)
+								return false
 							}
 						}
-						return true
-					})
-					if queryErr != nil && strings.Contains(queryErr.Error(), "undefined field object") {
-						return fmt.Errorf("%w\n\nNote: cursor-based pagination may not be supported by this API endpoint.\nTry using --api-url https://alpha.bv-brc.org/api or remove the --cursor flag", queryErr)
 					}
-				} else {
-					queryErr = client.QueryCallback(ctx, "genome", query, func(records []map[string]any, info *api.ChunkInfo) bool {
-						for _, record := range records {
-							for _, inputRow := range inputRowList {
-								var outRow []string
-								outRow = append(outRow, inputRow...)
-								for _, f := range fields {
-									outRow = append(outRow, cli.FormatValue(record[f], delim))
-								}
-								if err := writer.WriteRow(outRow...); err != nil {
-									fmt.Fprintf(os.Stderr, "Error writing row: %v\n", err)
-									return false
-								}
-							}
-						}
-						return true
-					})
-				}
+					return true
+				})
+
 				if queryErr != nil {
 					return fmt.Errorf("querying genomes for %s=%q: %w", keyName, key, queryErr)
 				}

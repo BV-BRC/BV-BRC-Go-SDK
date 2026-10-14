@@ -254,40 +254,10 @@ func run(cmd *cobra.Command, args []string) error {
 			query.In("genome_id", genomeIDs...)
 		}
 
-		// Execute the query (use cursor or standard pagination)
-		var queryErr error
-		if dataOpts.Cursor {
-			queryErr = client.QueryCallbackWithCursor(ctx, "feature", query, func(records []map[string]any, info *api.ChunkInfo) bool {
-				for _, record := range records {
-					famID, _ := record[famField].(string)
-					inputRow := rowMap[famID]
-					if inputRow == nil {
-						inputRow = []string{famID}
-					}
-
-					var outRow []string
-					outRow = append(outRow, inputRow...)
-					for _, f := range fields {
-						outRow = append(outRow, cli.FormatValue(record[f], delim))
-					}
-
-					if writeErr := writer.WriteRow(outRow...); writeErr != nil {
-						fmt.Fprintf(os.Stderr, "Error writing row: %v\n", writeErr)
-						return false
-					}
-				}
-				return true
-			})
-			if queryErr != nil && strings.Contains(queryErr.Error(), "undefined field object") {
-				return fmt.Errorf("%w\n\nNote: cursor-based pagination may not be supported by this API endpoint.\nTry using --api-url https://alpha.bv-brc.org/api or remove the --cursor flag", queryErr)
-			}
-		} else {
-			results, err := client.Query(ctx, "feature", query)
-			if err != nil {
-				return fmt.Errorf("querying features: %w", err)
-			}
-
-			for _, record := range results {
+		// Page by cursor, writing each record as it arrives, so a family with
+		// millions of members does not have to fit in memory first.
+		queryErr := client.QueryCallback(ctx, "feature", query, func(records []map[string]any, info *api.ChunkInfo) bool {
+			for _, record := range records {
 				famID, _ := record[famField].(string)
 				inputRow := rowMap[famID]
 				if inputRow == nil {
@@ -301,10 +271,12 @@ func run(cmd *cobra.Command, args []string) error {
 				}
 
 				if writeErr := writer.WriteRow(outRow...); writeErr != nil {
-					return fmt.Errorf("writing row: %w", writeErr)
+					fmt.Fprintf(os.Stderr, "Error writing row: %v\n", writeErr)
+					return false
 				}
 			}
-		}
+			return true
+		})
 		if queryErr != nil {
 			return fmt.Errorf("querying features: %w", queryErr)
 		}

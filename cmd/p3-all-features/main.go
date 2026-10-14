@@ -24,7 +24,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/BV-BRC/BV-BRC-Go-SDK/api"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/auth"
@@ -155,40 +154,18 @@ func run(cmd *cobra.Command, args []string) error {
 	// Get delimiter for multi-valued fields
 	delim := ioOpts.GetDelimiter()
 
-	// Choose pagination method based on --cursor flag
-	var queryFunc func() error
-	if dataOpts.Cursor {
-		// Use cursor-based pagination (more efficient for large result sets)
-		queryFunc = func() error {
-			err := client.QueryCallbackWithCursor(ctx, "feature", query, func(records []map[string]any, info *api.ChunkInfo) bool {
-				for _, record := range records {
-					row := cli.FormatRecord(record, fields, delim)
-					if err := writer.WriteRow(row...); err != nil {
-						fmt.Fprintf(os.Stderr, "Error writing row: %v\n", err)
-						return false
-					}
+	// Page by cursor, writing each record as it arrives.
+	queryFunc := func() error {
+		return client.QueryCallback(ctx, "feature", query, func(records []map[string]any, info *api.ChunkInfo) bool {
+			for _, record := range records {
+				row := cli.FormatRecord(record, fields, delim)
+				if err := writer.WriteRow(row...); err != nil {
+					fmt.Fprintf(os.Stderr, "Error writing row: %v\n", err)
+					return false
 				}
-				return true
-			})
-			if err != nil && strings.Contains(err.Error(), "undefined field object") {
-				return fmt.Errorf("%w\n\nNote: cursor-based pagination may not be supported by this API endpoint.\nTry using --api-url https://alpha.bv-brc.org/api or remove the --cursor flag", err)
 			}
-			return err
-		}
-	} else {
-		// Use offset-based pagination (default)
-		queryFunc = func() error {
-			return client.QueryCallback(ctx, "feature", query, func(records []map[string]any, info *api.ChunkInfo) bool {
-				for _, record := range records {
-					row := cli.FormatRecord(record, fields, delim)
-					if err := writer.WriteRow(row...); err != nil {
-						fmt.Fprintf(os.Stderr, "Error writing row: %v\n", err)
-						return false
-					}
-				}
-				return true
-			})
-		}
+			return true
+		})
 	}
 
 	// Execute query
