@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 
 	"github.com/BV-BRC/BV-BRC-Go-SDK/api"
 	"github.com/BV-BRC/BV-BRC-Go-SDK/auth"
@@ -210,42 +209,22 @@ func run(cmd *cobra.Command, args []string) error {
 
 			// Choose pagination method based on --cursor flag
 			var queryErr error
-			if dataOpts.Cursor {
-				queryErr = client.QueryCallbackWithCursor(ctx, "protein_structure", query, func(records []map[string]any, info *api.ChunkInfo) bool {
-					for _, record := range records {
-						var outRow []string
-						outRow = append(outRow, inputRow...)
-						for _, f := range fields {
-							outRow = append(outRow, cli.FormatValue(record[f], delim))
-						}
-
-						if err := writer.WriteRow(outRow...); err != nil {
-							fmt.Fprintf(os.Stderr, "Error writing row: %v\n", err)
-							return false
-						}
+			queryErr = client.QueryCallback(ctx, "protein_structure", query, func(records []map[string]any, info *api.ChunkInfo) bool {
+				for _, record := range records {
+					var outRow []string
+					outRow = append(outRow, inputRow...)
+					for _, f := range fields {
+						outRow = append(outRow, cli.FormatValue(record[f], delim))
 					}
-					return true
-				})
-				if queryErr != nil && strings.Contains(queryErr.Error(), "undefined field object") {
-					return fmt.Errorf("%w\n\nNote: cursor-based pagination may not be supported by this API endpoint.\nTry using --api-url https://alpha.bv-brc.org/api or remove the --cursor flag", queryErr)
+
+					if err := writer.WriteRow(outRow...); err != nil {
+						fmt.Fprintf(os.Stderr, "Error writing row: %v\n", err)
+						return false
+					}
 				}
-			} else {
-				queryErr = client.QueryCallback(ctx, "protein_structure", query, func(records []map[string]any, info *api.ChunkInfo) bool {
-					for _, record := range records {
-						var outRow []string
-						outRow = append(outRow, inputRow...)
-						for _, f := range fields {
-							outRow = append(outRow, cli.FormatValue(record[f], delim))
-						}
+				return true
+			})
 
-						if err := writer.WriteRow(outRow...); err != nil {
-							fmt.Fprintf(os.Stderr, "Error writing row: %v\n", err)
-							return false
-						}
-					}
-					return true
-				})
-			}
 			if queryErr != nil {
 				return fmt.Errorf("querying protein structures for genome %s: %w", key, queryErr)
 			}

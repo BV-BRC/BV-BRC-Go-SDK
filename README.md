@@ -316,7 +316,7 @@ All `p3-all-*`, `p3-get-*`, and `p3-find-*` commands accept standard data query 
 --attr field             select field (repeatable; default fields if omitted)
 --limit N                maximum rows to return
 --count                  return count only
---cursor                 cursor-based pagination (efficient for large result sets)
+--cursor                 deprecated no-op (pagination is always cursor-based)
 --sort field             sort by field (prefix - for descending)
 --max-retries N          retry failed API requests
 --verbose                print retry messages
