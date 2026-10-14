@@ -284,6 +284,8 @@ func TestQuery_Cursor(t *testing.T) {
 }
 
 func TestQuery_Build_WithCursor(t *testing.T) {
+	// The mark is percent-encoded: the API decodes the request body, and a
+	// base64 mark can contain +, / and =. %2A and * are accepted alike.
 	tests := []struct {
 		name  string
 		query *Query
@@ -292,12 +294,12 @@ func TestQuery_Build_WithCursor(t *testing.T) {
 		{
 			name:  "cursor only",
 			query: NewQuery().Cursor("*"),
-			want:  "cursor(*)",
+			want:  "cursor(%2A)",
 		},
 		{
 			name:  "cursor with base64 value",
 			query: NewQuery().Cursor("AoEoODMzMzIuMTI="),
-			want:  "cursor(AoEoODMzMzIuMTI=)",
+			want:  "cursor(AoEoODMzMzIuMTI%3D)",
 		},
 		{
 			name: "complete query with cursor",
@@ -306,7 +308,7 @@ func TestQuery_Build_WithCursor(t *testing.T) {
 				Eq("genome_id", "83332.12").
 				Cursor("*").
 				Limit(100),
-			want: "select(genome_id,genome_name)&eq(genome_id,83332.12)&cursor(*)",
+			want: "select(genome_id,genome_name)&eq(genome_id,83332.12)&cursor(%2A)",
 		},
 		{
 			name: "cursor with sort",
@@ -314,7 +316,7 @@ func TestQuery_Build_WithCursor(t *testing.T) {
 				Eq("genus", "Mycobacterium").
 				Sort("genome_id", false).
 				Cursor("*"),
-			want: "eq(genus,Mycobacterium)&sort(+genome_id)&cursor(*)",
+			want: "eq(genus,Mycobacterium)&sort(+genome_id)&cursor(%2A)",
 		},
 	}
 
