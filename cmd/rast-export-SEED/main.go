@@ -18,10 +18,10 @@ import (
 	"fmt"
 	"os"
 
-	_ "github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliproduct"
-	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliroot"
-	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/rastcli"
-	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/seeddir"
+	_ "github.com/BV-BRC/BV-BRC-Go-SDK/v2/internal/cliproduct"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/v2/internal/cliroot"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/v2/internal/rastcli"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/v2/internal/seeddir"
 	"github.com/spf13/cobra"
 )
 

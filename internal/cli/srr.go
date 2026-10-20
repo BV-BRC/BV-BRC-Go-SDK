@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/BV-BRC/BV-BRC-Go-SDK/sra"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/v2/sra"
 )
 
 // ValidateSRRUsage is the help text for --validate-srr. Shared so every submit

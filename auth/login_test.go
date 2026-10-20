@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/BV-BRC/BV-BRC-Go-SDK/version"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/v2/version"
 )
 
 const cfBlockPage = `<!DOCTYPE html><html><head><title>Access denied</title></head>

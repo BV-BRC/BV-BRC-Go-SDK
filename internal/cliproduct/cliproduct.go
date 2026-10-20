@@ -4,7 +4,7 @@
 //
 // It is imported for its side effect only:
 //
-//	import _ "github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliproduct"
+//	import _ "github.com/BV-BRC/BV-BRC-Go-SDK/v2/internal/cliproduct"
 //
 // Every command that talks to a service imports it -- except p3-login, which
 // declares version.AuthProduct instead. TestEveryCommandDeclaresAProduct (in
@@ -12,7 +12,7 @@
 // announcing itself as the library.
 package cliproduct
 
-import "github.com/BV-BRC/BV-BRC-Go-SDK/version"
+import "github.com/BV-BRC/BV-BRC-Go-SDK/v2/version"
 
 func init() {
 	version.SetProduct(version.CLIProduct)

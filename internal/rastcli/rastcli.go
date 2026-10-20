@@ -14,9 +14,9 @@ import (
 	"io"
 	"os"
 
-	"github.com/BV-BRC/BV-BRC-Go-SDK/auth"
-	"github.com/BV-BRC/BV-BRC-Go-SDK/genomeannotation"
-	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/seq"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/v2/auth"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/v2/genomeannotation"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/v2/internal/seq"
 	"github.com/spf13/cobra"
 )
 

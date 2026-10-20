@@ -32,7 +32,7 @@ const (
 
 // Version is stamped in at build time:
 //
-//	go build -ldflags "-X github.com/BV-BRC/BV-BRC-Go-SDK/version.Version=$(scripts/version.sh)"
+//	go build -ldflags "-X github.com/BV-BRC/BV-BRC-Go-SDK/v2/version.Version=$(scripts/version.sh)"
 //
 // scripts/version.sh yields the tag when HEAD is exactly tagged and the short
 // commit hash otherwise; the release workflow passes the pushed tag instead.
@@ -45,7 +45,7 @@ var fromBuildInfo = sync.OnceValue(func() string {
 	// Fall back to whatever the toolchain recorded.
 	// Builds in this tree pass -buildvcs=false (the git+svn mix in the
 	// dev_container breaks VCS stamping), so in practice this path is for
-	// `go install github.com/BV-BRC/BV-BRC-Go-SDK/cmd/...@v2.0.12` users,
+	// `go install github.com/BV-BRC/BV-BRC-Go-SDK/v2/cmd/...@v2.0.12` users,
 	// where Main.Version carries the module version.
 	info, ok := debug.ReadBuildInfo()
 	if !ok {

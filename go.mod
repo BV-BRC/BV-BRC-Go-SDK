@@ -1,4 +1,4 @@
-module github.com/BV-BRC/BV-BRC-Go-SDK
+module github.com/BV-BRC/BV-BRC-Go-SDK/v2
 
 go 1.24.0
 

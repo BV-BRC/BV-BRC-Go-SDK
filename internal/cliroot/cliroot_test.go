@@ -11,9 +11,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliroot"
-	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/httpdiag"
-	"github.com/BV-BRC/BV-BRC-Go-SDK/version"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/v2/internal/cliroot"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/v2/internal/httpdiag"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/v2/version"
 	"github.com/spf13/cobra"
 )
 
@@ -224,7 +224,7 @@ func TestExecuteRegistersTheFlag(t *testing.T) {
 // lacks --version and --debug-http. Only a test catches that.
 func TestEveryCommandUsesTheSharedRoot(t *testing.T) {
 	const (
-		pkg     = "github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliroot"
+		pkg     = "github.com/BV-BRC/BV-BRC-Go-SDK/v2/internal/cliroot"
 		cmdRoot = "../../cmd"
 	)
 

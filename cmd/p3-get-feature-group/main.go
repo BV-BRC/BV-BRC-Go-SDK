@@ -27,11 +27,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/BV-BRC/BV-BRC-Go-SDK/api"
-	"github.com/BV-BRC/BV-BRC-Go-SDK/auth"
-	_ "github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliproduct"
-	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliroot"
-	"github.com/BV-BRC/BV-BRC-Go-SDK/workspace"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/v2/api"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/v2/auth"
+	_ "github.com/BV-BRC/BV-BRC-Go-SDK/v2/internal/cliproduct"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/v2/internal/cliroot"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/v2/workspace"
 	"github.com/spf13/cobra"
 )
 

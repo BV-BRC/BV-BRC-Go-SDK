@@ -7,7 +7,7 @@ package cli
 import (
 	"strings"
 
-	"github.com/BV-BRC/BV-BRC-Go-SDK/api"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/v2/api"
 	"github.com/spf13/cobra"
 )
 

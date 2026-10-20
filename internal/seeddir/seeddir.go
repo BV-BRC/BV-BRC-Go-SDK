@@ -21,7 +21,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/seq"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/v2/internal/seq"
 )
 
 // Genome is the part of a genome typed object a SEED directory is built from.

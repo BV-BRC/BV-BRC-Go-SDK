@@ -13,8 +13,8 @@ import (
 	"runtime"
 	"strconv"
 
-	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/httpdiag"
-	"github.com/BV-BRC/BV-BRC-Go-SDK/version"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/v2/internal/httpdiag"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/v2/version"
 	"github.com/spf13/cobra"
 )
 
