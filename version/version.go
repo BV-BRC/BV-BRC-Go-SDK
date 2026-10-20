@@ -52,7 +52,7 @@ var fromBuildInfo = sync.OnceValue(func() string {
 		return "unknown"
 	}
 	if v := info.Main.Version; v != "" && v != "(devel)" {
-		return v
+		return normalizeModuleVersion(v)
 	}
 	var rev string
 	var dirty bool
@@ -75,6 +75,19 @@ var fromBuildInfo = sync.OnceValue(func() string {
 	}
 	return rev
 })
+
+// normalizeModuleVersion renders a module version the way the release builds
+// render a tag.
+//
+// A version recovered from build info is a module version and carries a
+// leading "v"; the release scripts strip it (VERSION=${GITHUB_REF_NAME#v}).
+// Without this, `go install ...@v2.0.17` and the v2.0.17 release archive --
+// the same code -- would report different versions and send different
+// User-Agents. Reachable only since the module was renamed to /v2, which is
+// what made `go install` at a release tag work at all.
+func normalizeModuleVersion(v string) string {
+	return strings.TrimPrefix(v, "v")
+}
 
 // Get returns the build version: a tag like "2.0.12" for a release build, a
 // short commit hash for a build off an untagged checkout, or "unknown" when

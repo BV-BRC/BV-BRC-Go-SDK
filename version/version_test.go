@@ -131,3 +131,21 @@ func TestUserAgentStripsControlCharacters(t *testing.T) {
 		t.Errorf("UserAgent() = %q, want control characters stripped", got)
 	}
 }
+
+// A `go install ...@v2.0.17` build recovers its version from build info,
+// where it is a module version spelled with a leading "v". The release builds
+// strip that. If these disagree the same release reports two versions and
+// sends two different User-Agents depending on how it was installed.
+func TestModuleVersionIsRenderedLikeAReleaseTag(t *testing.T) {
+	for _, tc := range []struct {
+		in, want string
+	}{
+		{"v2.0.17", "2.0.17"},
+		{"2.0.17", "2.0.17"},
+		{"v0.0.0-20261014201752-0e6c61cf7852", "0.0.0-20261014201752-0e6c61cf7852"},
+	} {
+		if got := normalizeModuleVersion(tc.in); got != tc.want {
+			t.Errorf("normalizeModuleVersion(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
