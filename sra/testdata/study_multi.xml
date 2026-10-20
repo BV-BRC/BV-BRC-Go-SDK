@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"  ?>
+<EXPERIMENT_PACKAGE_SET>
+<EXPERIMENT_PACKAGE>
+  <EXPERIMENT accession="SRX60000001" alias="study-multi-exp-1">
+    <IDENTIFIERS><PRIMARY_ID>SRX60000001</PRIMARY_ID></IDENTIFIERS>
+    <TITLE>Study multi-package experiment 1</TITLE>
+    <STUDY_REF accession="SRP60000000"><IDENTIFIERS><PRIMARY_ID>SRP60000000</PRIMARY_ID></IDENTIFIERS></STUDY_REF>
+  </EXPERIMENT>
+  <STUDY center_name="BioProject" alias="PRJNA6000000" accession="SRP60000000">
+    <IDENTIFIERS><PRIMARY_ID>SRP60000000</PRIMARY_ID></IDENTIFIERS>
+    <DESCRIPTOR>
+      <STUDY_TITLE>Study spanning multiple experiment packages</STUDY_TITLE>
+    </DESCRIPTOR>
+  </STUDY>
+  <RUN_SET runs="1">
+    <RUN accession="SRR60000001" alias="study-multi-run-1" total_spots="1000">
+      <IDENTIFIERS><PRIMARY_ID>SRR60000001</PRIMARY_ID></IDENTIFIERS>
+    </RUN>
+  </RUN_SET>
+</EXPERIMENT_PACKAGE>
+<EXPERIMENT_PACKAGE>
+  <EXPERIMENT accession="SRX60000002" alias="study-multi-exp-2">
+    <IDENTIFIERS><PRIMARY_ID>SRX60000002</PRIMARY_ID></IDENTIFIERS>
+    <TITLE>Study multi-package experiment 2</TITLE>
+    <STUDY_REF accession="SRP60000000"><IDENTIFIERS><PRIMARY_ID>SRP60000000</PRIMARY_ID></IDENTIFIERS></STUDY_REF>
+  </EXPERIMENT>
+  <STUDY center_name="BioProject" alias="PRJNA6000000" accession="SRP60000000">
+    <IDENTIFIERS><PRIMARY_ID>SRP60000000</PRIMARY_ID></IDENTIFIERS>
+    <DESCRIPTOR>
+      <STUDY_TITLE>Study spanning multiple experiment packages</STUDY_TITLE>
+    </DESCRIPTOR>
+  </STUDY>
+  <RUN_SET runs="1">
+    <RUN accession="SRR60000002" alias="study-multi-run-2" total_spots="2000">
+      <IDENTIFIERS><PRIMARY_ID>SRR60000002</PRIMARY_ID></IDENTIFIERS>
+    </RUN>
+  </RUN_SET>
+</EXPERIMENT_PACKAGE>
+<EXPERIMENT_PACKAGE>
+  <EXPERIMENT accession="SRX60000003" alias="study-multi-exp-3">
+    <IDENTIFIERS><PRIMARY_ID>SRX60000003</PRIMARY_ID></IDENTIFIERS>
+    <TITLE>Study multi-package experiment 3</TITLE>
+    <STUDY_REF accession="SRP60000000"><IDENTIFIERS><PRIMARY_ID>SRP60000000</PRIMARY_ID></IDENTIFIERS></STUDY_REF>
+  </EXPERIMENT>
+  <STUDY center_name="BioProject" alias="PRJNA6000000" accession="SRP60000000">
+    <IDENTIFIERS><PRIMARY_ID>SRP60000000</PRIMARY_ID></IDENTIFIERS>
+    <DESCRIPTOR>
+      <STUDY_TITLE>Study spanning multiple experiment packages</STUDY_TITLE>
+    </DESCRIPTOR>
+  </STUDY>
+  <RUN_SET runs="1">
+    <RUN accession="SRR60000003" alias="study-multi-run-3" total_spots="3000">
+      <IDENTIFIERS><PRIMARY_ID>SRR60000003</PRIMARY_ID></IDENTIFIERS>
+    </RUN>
+  </RUN_SET>
+</EXPERIMENT_PACKAGE>
+</EXPERIMENT_PACKAGE_SET>

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"  ?>
+<EXPERIMENT_PACKAGE_SET>
+<EXPERIMENT_PACKAGE>
+  <EXPERIMENT accession="SRX50000001" alias="illumina-paired-exp">
+    <IDENTIFIERS><PRIMARY_ID>SRX50000001</PRIMARY_ID></IDENTIFIERS>
+    <TITLE>Illumina paired-end whole genome sequencing</TITLE>
+    <STUDY_REF accession="SRP50000001"><IDENTIFIERS><PRIMARY_ID>SRP50000001</PRIMARY_ID></IDENTIFIERS></STUDY_REF>
+    <DESIGN>
+      <DESIGN_DESCRIPTION>Whole genome shotgun sequencing</DESIGN_DESCRIPTION>
+      <SAMPLE_DESCRIPTOR accession="SRS50000001"/>
+      <LIBRARY_DESCRIPTOR>
+        <LIBRARY_NAME>lib1</LIBRARY_NAME>
+        <LIBRARY_STRATEGY>WGS</LIBRARY_STRATEGY>
+        <LIBRARY_SOURCE>GENOMIC</LIBRARY_SOURCE>
+        <LIBRARY_SELECTION>RANDOM</LIBRARY_SELECTION>
+        <LIBRARY_LAYOUT><PAIRED NOMINAL_LENGTH="300" NOMINAL_SDEV="0"/></LIBRARY_LAYOUT>
+      </LIBRARY_DESCRIPTOR>
+    </DESIGN>
+    <PLATFORM>
+      <ILLUMINA>
+        <INSTRUMENT_MODEL>Illumina NovaSeq 6000</INSTRUMENT_MODEL>
+      </ILLUMINA>
+    </PLATFORM>
+  </EXPERIMENT>
+  <SUBMISSION accession="SRA50000001" center_name="TEST"/>
+  <STUDY center_name="BioProject" alias="PRJNA5000001" accession="SRP50000001">
+    <IDENTIFIERS><PRIMARY_ID>SRP50000001</PRIMARY_ID></IDENTIFIERS>
+    <DESCRIPTOR>
+      <STUDY_TITLE>Test illumina paired-end study</STUDY_TITLE>
+    </DESCRIPTOR>
+  </STUDY>
+  <SAMPLE accession="SRS50000001">
+    <IDENTIFIERS><PRIMARY_ID>SRS50000001</PRIMARY_ID></IDENTIFIERS>
+    <TITLE>test sample</TITLE>
+  </SAMPLE>
+  <RUN_SET runs="1" bases="150000000" spots="500000">
+    <RUN accession="SRR50000001" alias="illumina-run-1" total_spots="500000" total_bases="150000000" size="95000000">
+      <IDENTIFIERS><PRIMARY_ID>SRR50000001</PRIMARY_ID></IDENTIFIERS>
+      <Statistics nreads="2" nspots="500000">
+        <Read index="0" count="500000" average="150" stdev="0"/>
+        <Read index="1" count="500000" average="150" stdev="0"/>
+      </Statistics>
+    </RUN>
+  </RUN_SET>
+</EXPERIMENT_PACKAGE>
+</EXPERIMENT_PACKAGE_SET>
