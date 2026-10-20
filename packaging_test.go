@@ -116,6 +116,80 @@ func TestPackageFileListsCoverEveryFamily(t *testing.T) {
 	}
 }
 
+// ldflagsVersionRE matches the import path in an `-X <path>.Version=` flag.
+var ldflagsVersionRE = regexp.MustCompile(`-X \$?\{?([^\s"}]+)\}?\.Version=`)
+
+// TestVersionStampPathTracksTheModulePath guards the -X linker flag that
+// stamps version.Version into every binary.
+//
+// The linker silently ignores an -X whose package path does not resolve. The
+// build succeeds, the archive is the right size, and every binary reports
+// "unknown" both from --version and in the User-Agent it sends -- which is
+// the one string a Cloudflare 1010 report is supposed to quote. Nothing else
+// catches it: CI does not run these tests, and no job inspects a built
+// binary.
+//
+// Five separate files spell the version package by its full import path, so
+// renaming the module (v1 -> /v2) could ship a whole platform unstamped by
+// missing one of them. The expectation is derived from go.mod rather than
+// written down, so this cannot go stale on the next rename.
+func TestVersionStampPathTracksTheModulePath(t *testing.T) {
+	want := modulePath(t) + "/version"
+
+	// The Makefile names the package once and refers to it indirectly.
+	makefile := readFile(t, "Makefile")
+	m := regexp.MustCompile(`(?m)^VERSION_PKG\s*:?=\s*(\S+)`).FindStringSubmatch(makefile)
+	if m == nil {
+		t.Fatal("Makefile no longer declares VERSION_PKG")
+	}
+	if m[1] != want {
+		t.Errorf("Makefile VERSION_PKG is %q, want %q; "+
+			"binaries built by `make` would report an unknown version", m[1], want)
+	}
+	if !strings.Contains(makefile, "$(VERSION_PKG).Version=") {
+		t.Error("Makefile LDFLAGS no longer stamps $(VERSION_PKG).Version; " +
+			"the VERSION_PKG check above is then vacuous")
+	}
+
+	// The release scripts each spell the path out in full.
+	for _, script := range []string{
+		"build-linux.sh",
+		"build-macos.sh",
+		"build-windows.sh",
+		"build-macos-pkg.sh",
+	} {
+		t.Run(script, func(t *testing.T) {
+			body := readFile(t, script)
+
+			found := ldflagsVersionRE.FindStringSubmatch(body)
+			if found == nil {
+				t.Fatalf("%s does not stamp a version with -X <path>.Version=", script)
+			}
+			if found[1] != want {
+				t.Errorf("%s stamps %q, want %q; the linker ignores an "+
+					"unresolvable -X silently, so this platform's binaries "+
+					"would ship reporting \"unknown\"", script, found[1], want)
+			}
+			// A stamp that is computed but never passed to `go build` fails
+			// exactly the same way.
+			if !strings.Contains(body, "$LDFLAGS_VERSION") {
+				t.Errorf("%s computes LDFLAGS_VERSION but never uses it", script)
+			}
+		})
+	}
+}
+
+// modulePath returns the module path declared in go.mod.
+func modulePath(t *testing.T) string {
+	t.Helper()
+
+	m := regexp.MustCompile(`(?m)^module\s+(\S+)`).FindStringSubmatch(readFile(t, "go.mod"))
+	if m == nil {
+		t.Fatal("go.mod has no module line")
+	}
+	return m[1]
+}
+
 // TestReadmeCountsAreNotHardCoded guards the tool count in the shipped README,
 // which was wrong every time a command was added until it was noticed.
 func TestReadmeCountsAreNotHardCoded(t *testing.T) {

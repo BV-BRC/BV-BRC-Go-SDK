@@ -15,11 +15,11 @@ import (
 	"os"
 	"sort"
 
-	"github.com/BV-BRC/BV-BRC-Go-SDK/genomeannotation"
-	_ "github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliproduct"
-	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliroot"
-	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/rastcli"
-	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/seq"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/v2/genomeannotation"
+	_ "github.com/BV-BRC/BV-BRC-Go-SDK/v2/internal/cliproduct"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/v2/internal/cliroot"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/v2/internal/rastcli"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/v2/internal/seq"
 	"github.com/spf13/cobra"
 )
 

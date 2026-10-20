@@ -10,7 +10,7 @@ GOARCH ?= $(shell $(GO) env GOARCH 2>/dev/null || echo amd64)
 VERSION ?= $(shell sh scripts/version.sh)
 BUILD_TIME ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 
-VERSION_PKG := github.com/BV-BRC/BV-BRC-Go-SDK/version
+VERSION_PKG := github.com/BV-BRC/BV-BRC-Go-SDK/v2/version
 LDFLAGS := -ldflags "-X $(VERSION_PKG).Version=$(VERSION) -X main.Version=$(VERSION) -X main.BuildTime=$(BUILD_TIME)"
 
 # VCS stamping off. A checkout that sits under another VCS working copy (the

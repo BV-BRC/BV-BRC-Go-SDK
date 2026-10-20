@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/BV-BRC/BV-BRC-Go-SDK/genomeannotation"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/v2/genomeannotation"
 	"github.com/spf13/cobra"
 )
 

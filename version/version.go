@@ -32,7 +32,7 @@ const (
 
 // Version is stamped in at build time:
 //
-//	go build -ldflags "-X github.com/BV-BRC/BV-BRC-Go-SDK/version.Version=$(scripts/version.sh)"
+//	go build -ldflags "-X github.com/BV-BRC/BV-BRC-Go-SDK/v2/version.Version=$(scripts/version.sh)"
 //
 // scripts/version.sh yields the tag when HEAD is exactly tagged and the short
 // commit hash otherwise; the release workflow passes the pushed tag instead.
@@ -45,14 +45,14 @@ var fromBuildInfo = sync.OnceValue(func() string {
 	// Fall back to whatever the toolchain recorded.
 	// Builds in this tree pass -buildvcs=false (the git+svn mix in the
 	// dev_container breaks VCS stamping), so in practice this path is for
-	// `go install github.com/BV-BRC/BV-BRC-Go-SDK/cmd/...@v2.0.12` users,
+	// `go install github.com/BV-BRC/BV-BRC-Go-SDK/v2/cmd/...@v2.0.12` users,
 	// where Main.Version carries the module version.
 	info, ok := debug.ReadBuildInfo()
 	if !ok {
 		return "unknown"
 	}
 	if v := info.Main.Version; v != "" && v != "(devel)" {
-		return v
+		return normalizeModuleVersion(v)
 	}
 	var rev string
 	var dirty bool
@@ -75,6 +75,19 @@ var fromBuildInfo = sync.OnceValue(func() string {
 	}
 	return rev
 })
+
+// normalizeModuleVersion renders a module version the way the release builds
+// render a tag.
+//
+// A version recovered from build info is a module version and carries a
+// leading "v"; the release scripts strip it (VERSION=${GITHUB_REF_NAME#v}).
+// Without this, `go install ...@v2.0.17` and the v2.0.17 release archive --
+// the same code -- would report different versions and send different
+// User-Agents. Reachable only since the module was renamed to /v2, which is
+// what made `go install` at a release tag work at all.
+func normalizeModuleVersion(v string) string {
+	return strings.TrimPrefix(v, "v")
+}
 
 // Get returns the build version: a tag like "2.0.12" for a release build, a
 // short commit hash for a build off an untagged checkout, or "unknown" when

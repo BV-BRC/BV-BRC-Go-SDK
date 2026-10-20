@@ -51,7 +51,7 @@ to find before a tag exists than after:
 ```bash
 VERSION=2.0.14 ./build-linux.sh
 go version -m dist/bvbrc-cli-2.0.14-linux-amd64/bin/p3-ls | grep ldflags
-#   -X github.com/BV-BRC/BV-BRC-Go-SDK/version.Version=2.0.14
+#   -X github.com/BV-BRC/BV-BRC-Go-SDK/v2/version.Version=2.0.14
 ```
 
 ## 2. Tag and push
@@ -125,9 +125,19 @@ patch instead.
 
 ## Note on `go install`
 
-`go install github.com/BV-BRC/BV-BRC-Go-SDK/cmd/p3-ls@v2.0.14` does **not**
-work, from any repository: the module path has no `/v2` suffix, so the module
-proxy rejects every `v2.x` tag ("module path must match major version"). The
-release archives and the conda package are the distribution channels. Fixing
-this would mean renaming the module to `…/v2` — which rewrites every import
-path in the tree — or moving to a v1 line.
+`go install github.com/BV-BRC/BV-BRC-Go-SDK/v2/cmd/p3-ls@v2.0.17` works, as
+does `go get` of the library packages, **from v2.0.17 onward**. The module was
+renamed from `github.com/BV-BRC/BV-BRC-Go-SDK` to `…/v2` to make that possible:
+Go requires a module at major version 2 or above to carry the major version in
+its path, and until the rename the proxy rejected every `v2.x` tag ("module
+path must match major version").
+
+Tags **v2.0.1 through v2.0.16 remain unusable** this way and cannot be fixed.
+The rejection is based on the `go.mod` recorded in each tag, so it would take
+re-tagging — which republishes conda packages over themselves, exactly what
+"burn the number" above exists to avoid. Leave them.
+
+A tag must therefore be cut from a commit whose `go.mod` already declares the
+`/v2` path. The release archives and the conda package remain the primary
+distribution channels; `go install` is for someone who wants one tool inside
+their own Go toolchain.

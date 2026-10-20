@@ -15,11 +15,11 @@ This module provides:
 
 ```go
 import (
-    "github.com/BV-BRC/BV-BRC-Go-SDK/api"                // Data API client
-    "github.com/BV-BRC/BV-BRC-Go-SDK/appservice"         // Job submission
-    "github.com/BV-BRC/BV-BRC-Go-SDK/auth"               // Authentication
-    "github.com/BV-BRC/BV-BRC-Go-SDK/genomeannotation"   // Genome annotation service
-    "github.com/BV-BRC/BV-BRC-Go-SDK/workspace"          // Workspace/file operations
+    "github.com/BV-BRC/BV-BRC-Go-SDK/v2/api"                // Data API client
+    "github.com/BV-BRC/BV-BRC-Go-SDK/v2/appservice"         // Job submission
+    "github.com/BV-BRC/BV-BRC-Go-SDK/v2/auth"               // Authentication
+    "github.com/BV-BRC/BV-BRC-Go-SDK/v2/genomeannotation"   // Genome annotation service
+    "github.com/BV-BRC/BV-BRC-Go-SDK/v2/workspace"          // Workspace/file operations
 )
 ```
 
@@ -526,12 +526,15 @@ See `PORT_STATUS.md` for the per-command sync ledger and stale-check commands.
 ## Using as a Library
 
 ```bash
-go get github.com/BV-BRC/BV-BRC-Go-SDK
+go get github.com/BV-BRC/BV-BRC-Go-SDK/v2@v2.0.17
 ```
 
-> **You cannot pin to a release tag.** `go.mod` declares the module as
-> `github.com/BV-BRC/BV-BRC-Go-SDK` with no `/v2` suffix, while the released
-> tags are `v2.x`, so the module proxy rejects every one of them:
+**The import path ends in `/v2`.** Go requires a module at major version 2 or
+above to carry the major version in its path, so every import is
+`github.com/BV-BRC/BV-BRC-Go-SDK/v2/<package>`.
+
+> **Releases before v2.0.17 cannot be pinned.** The module was declared without
+> the `/v2` suffix until then, so the proxy rejects those tags outright:
 >
 > ```
 > $ go get github.com/BV-BRC/BV-BRC-Go-SDK@v2.0.16
@@ -539,15 +542,21 @@ go get github.com/BV-BRC/BV-BRC-Go-SDK
 > match major version ("github.com/BV-BRC/BV-BRC-Go-SDK/v2")
 > ```
 >
-> A plain `go get` (or `@latest`) therefore resolves to a **pseudo-version of
-> the current `main`**, e.g. `v0.0.0-20261014201752-0e6c61cf7852` — it works,
-> but it is not the released version and will not track one. For a reproducible
-> build, pin that pseudo-version explicitly in your own `go.mod`.
->
-> For the same reason `go install github.com/BV-BRC/BV-BRC-Go-SDK/cmd/p3-ls@v2.0.16`
-> does not work. Install the CLI from a release archive, the conda package or an
-> installer instead. Fixing this means renaming the module to `…/v2`, which
-> rewrites every import path.
+> There is nothing to be done about those tags — the rejection is based on the
+> `go.mod` recorded *in* each one. Use v2.0.17 or later. To build against
+> unreleased work, `go get github.com/BV-BRC/BV-BRC-Go-SDK/v2@main` resolves to
+> a pseudo-version of the current `main`.
+
+`go install` works the same way, and is a supported way to get a single tool:
+
+```bash
+go install github.com/BV-BRC/BV-BRC-Go-SDK/v2/cmd/p3-ls@v2.0.17
+```
+
+A binary installed this way is stamped from its module version rather than by
+the release build scripts; `p3-ls --version` reports it either way. For the
+whole 138-tool suite, a release archive, the conda package or an installer
+remains the easier route.
 
 ### Example: Query Genomes
 
@@ -557,7 +566,7 @@ package main
 import (
     "context"
     "fmt"
-    "github.com/BV-BRC/BV-BRC-Go-SDK/api"
+    "github.com/BV-BRC/BV-BRC-Go-SDK/v2/api"
 )
 
 func main() {
@@ -584,8 +593,8 @@ package main
 
 import (
     "fmt"
-    "github.com/BV-BRC/BV-BRC-Go-SDK/appservice"
-    "github.com/BV-BRC/BV-BRC-Go-SDK/auth"
+    "github.com/BV-BRC/BV-BRC-Go-SDK/v2/appservice"
+    "github.com/BV-BRC/BV-BRC-Go-SDK/v2/auth"
 )
 
 func main() {
@@ -614,8 +623,8 @@ package main
 
 import (
     "fmt"
-    "github.com/BV-BRC/BV-BRC-Go-SDK/auth"
-    "github.com/BV-BRC/BV-BRC-Go-SDK/workspace"
+    "github.com/BV-BRC/BV-BRC-Go-SDK/v2/auth"
+    "github.com/BV-BRC/BV-BRC-Go-SDK/v2/workspace"
 )
 
 func main() {

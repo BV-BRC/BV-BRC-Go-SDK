@@ -12,8 +12,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/BV-BRC/BV-BRC-Go-SDK/api"
-	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cli"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/v2/api"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/v2/internal/cli"
 )
 
 // Test data - matching the Perl ROWS constant

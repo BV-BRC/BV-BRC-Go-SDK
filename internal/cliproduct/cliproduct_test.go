@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	_ "github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliproduct"
-	"github.com/BV-BRC/BV-BRC-Go-SDK/version"
+	_ "github.com/BV-BRC/BV-BRC-Go-SDK/v2/internal/cliproduct"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/v2/version"
 )
 
 func TestImportDeclaresTheCLIProduct(t *testing.T) {
@@ -32,8 +32,8 @@ func TestImportDeclaresTheCLIProduct(t *testing.T) {
 // service call should have to come here and remove itself from the list.
 func TestEveryCommandDeclaresAProduct(t *testing.T) {
 	const (
-		cliPkg  = "github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliproduct"
-		verPkg  = "github.com/BV-BRC/BV-BRC-Go-SDK/version"
+		cliPkg  = "github.com/BV-BRC/BV-BRC-Go-SDK/v2/internal/cliproduct"
+		verPkg  = "github.com/BV-BRC/BV-BRC-Go-SDK/v2/version"
 		cmdRoot = "../../cmd"
 	)
 

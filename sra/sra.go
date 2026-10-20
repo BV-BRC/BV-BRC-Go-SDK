@@ -25,7 +25,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/BV-BRC/BV-BRC-Go-SDK/version"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/v2/version"
 )
 
 const (

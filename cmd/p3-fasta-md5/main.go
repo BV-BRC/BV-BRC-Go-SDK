@@ -20,7 +20,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/BV-BRC/BV-BRC-Go-SDK/internal/cliroot"
+	"github.com/BV-BRC/BV-BRC-Go-SDK/v2/internal/cliroot"
 	"github.com/spf13/cobra"
 )
 
