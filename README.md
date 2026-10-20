@@ -34,17 +34,19 @@ unauthenticated.
 
 ## Installation
 
-Current release: **2.0.15**. Substitute another version below to install it;
+Current release: **2.0.16**. Substitute another version below to install it;
 the archives are attached to each
 [GitHub release](https://github.com/BV-BRC/BV-BRC-Go-SDK/releases).
 
 ### conda (all platforms)
 
 ```bash
-conda install -c bv-brc bvbrc-cli
+conda install -c bv-brc bvbrc-cli          # latest
+conda install -c bv-brc bvbrc-cli=2.0.16   # a specific version
 ```
 
 Packages are published for linux-64, linux-aarch64, osx-64 and osx-arm64.
+There is no Windows conda package — use the installer or zip below.
 
 ### Linux
 
@@ -53,83 +55,146 @@ Each archive expands into a versioned directory containing `bin/` — not a bare
 
 ```bash
 # x86_64
-curl -LO https://github.com/BV-BRC/BV-BRC-Go-SDK/releases/download/v2.0.15/bvbrc-cli-2.0.15-linux-amd64.tar.gz
-tar -xzf bvbrc-cli-2.0.15-linux-amd64.tar.gz
-sudo cp bvbrc-cli-2.0.15-linux-amd64/bin/* /usr/local/bin/
+curl -LO https://github.com/BV-BRC/BV-BRC-Go-SDK/releases/download/v2.0.16/bvbrc-cli-2.0.16-linux-amd64.tar.gz
+tar -xzf bvbrc-cli-2.0.16-linux-amd64.tar.gz
+sudo cp bvbrc-cli-2.0.16-linux-amd64/bin/* /usr/local/bin/
 
 # ARM64 (e.g. Raspberry Pi, AWS Graviton)
-curl -LO https://github.com/BV-BRC/BV-BRC-Go-SDK/releases/download/v2.0.15/bvbrc-cli-2.0.15-linux-arm64.tar.gz
-tar -xzf bvbrc-cli-2.0.15-linux-arm64.tar.gz
-sudo cp bvbrc-cli-2.0.15-linux-arm64/bin/* /usr/local/bin/
+curl -LO https://github.com/BV-BRC/BV-BRC-Go-SDK/releases/download/v2.0.16/bvbrc-cli-2.0.16-linux-arm64.tar.gz
+tar -xzf bvbrc-cli-2.0.16-linux-arm64.tar.gz
+sudo cp bvbrc-cli-2.0.16-linux-arm64/bin/* /usr/local/bin/
 ```
 
 A `.deb` is also published for each architecture, and installs into
 `/usr/local/bin`:
 
 ```bash
-curl -LO https://github.com/BV-BRC/BV-BRC-Go-SDK/releases/download/v2.0.15/bvbrc-cli_2.0.15_amd64.deb
-sudo dpkg -i bvbrc-cli_2.0.15_amd64.deb
+curl -LO https://github.com/BV-BRC/BV-BRC-Go-SDK/releases/download/v2.0.16/bvbrc-cli_2.0.16_amd64.deb
+sudo dpkg -i bvbrc-cli_2.0.16_amd64.deb
 ```
 
 ### macOS
 
+#### Installer package (simplest)
+
+A `.pkg` installer is published for each architecture. It installs the tools
+into `/usr/local/bin`, which is already on the default `PATH`.
+
 ```bash
 # Apple Silicon
-curl -LO https://github.com/BV-BRC/BV-BRC-Go-SDK/releases/download/v2.0.15/bvbrc-cli-2.0.15-darwin-arm64.tar.gz
-tar -xzf bvbrc-cli-2.0.15-darwin-arm64.tar.gz
-sudo cp bvbrc-cli-2.0.15-darwin-arm64/bin/* /usr/local/bin/
+curl -LO https://github.com/BV-BRC/BV-BRC-Go-SDK/releases/download/v2.0.16/bvbrc-cli-2.0.16-apple-silicon.pkg
+sudo installer -pkg bvbrc-cli-2.0.16-apple-silicon.pkg -target /
 
 # Intel
-curl -LO https://github.com/BV-BRC/BV-BRC-Go-SDK/releases/download/v2.0.15/bvbrc-cli-2.0.15-darwin-amd64.tar.gz
-tar -xzf bvbrc-cli-2.0.15-darwin-amd64.tar.gz
-sudo cp bvbrc-cli-2.0.15-darwin-amd64/bin/* /usr/local/bin/
+curl -LO https://github.com/BV-BRC/BV-BRC-Go-SDK/releases/download/v2.0.16/bvbrc-cli-2.0.16-intel.pkg
+sudo installer -pkg bvbrc-cli-2.0.16-intel.pkg -target /
+```
+
+Double-clicking the `.pkg` works too, but see the signing note below — an
+unsigned package opened from Finder is refused until you allow it, whereas
+`sudo installer` on a file fetched with `curl` is not.
+
+#### Tarball
+
+```bash
+# Apple Silicon
+curl -LO https://github.com/BV-BRC/BV-BRC-Go-SDK/releases/download/v2.0.16/bvbrc-cli-2.0.16-darwin-arm64.tar.gz
+tar -xzf bvbrc-cli-2.0.16-darwin-arm64.tar.gz
+sudo cp bvbrc-cli-2.0.16-darwin-arm64/bin/* /usr/local/bin/
+
+# Intel
+curl -LO https://github.com/BV-BRC/BV-BRC-Go-SDK/releases/download/v2.0.16/bvbrc-cli-2.0.16-darwin-amd64.tar.gz
+tar -xzf bvbrc-cli-2.0.16-darwin-amd64.tar.gz
+sudo cp bvbrc-cli-2.0.16-darwin-amd64/bin/* /usr/local/bin/
 ```
 
 A `darwin-universal` tarball containing fat binaries for both architectures is
 also published, if you would rather ship one build to mixed hardware.
 
-> **macOS note:** binaries are not yet code-signed. If Gatekeeper blocks them,
-> run `xattr -dr com.apple.quarantine /usr/local/bin/p3-* /usr/local/bin/rast-*` after copying, or
-> extract with `curl` rather than a browser (browser downloads set the quarantine
-> attribute; `curl`/`wget` do not).
+> **macOS note: nothing here is code-signed or notarized**, the `.pkg`
+> installers included. Two consequences:
+>
+> - **Opened from Finder**, an unsigned `.pkg` is blocked. Either right-click →
+>   **Open** and confirm, or approve it under **System Settings → Privacy &
+>   Security** after the first attempt. Installing from the command line with
+>   `sudo installer` avoids this.
+> - **For the tarballs**, if Gatekeeper blocks the binaries run
+>   `xattr -dr com.apple.quarantine /usr/local/bin/p3-* /usr/local/bin/rast-*`
+>   after copying — or download with `curl`/`wget` rather than a browser, since
+>   only browser downloads set the quarantine attribute.
 
 ### Windows
 
+#### Installer (recommended, x64)
+
+Download `bvbrc-cli-2.0.16-windows-amd64-setup.exe` from the releases page and
+run it as Administrator. It installs to `C:\Program Files\BVBRC`, **adds that
+directory to the system `PATH`**, and registers an entry in Add/Remove Programs
+so it can be uninstalled cleanly.
+
+Open a **new** terminal afterwards — a running shell does not pick up a `PATH`
+change made by the installer.
+
 ```powershell
-# x64 (most PCs)
-# Download bvbrc-cli-2.0.15-windows-amd64.zip from the releases page, then:
-Expand-Archive bvbrc-cli-2.0.15-windows-amd64.zip .
-# The .exe files sit at the top of the extracted directory (no bin\ on Windows).
-# Copy them to a directory on your PATH, e.g.:
-Copy-Item bvbrc-cli-2.0.15-windows-amd64\*.exe C:\Windows\System32\
 p3-login
 ```
 
-Or run one of the included installers from the extracted directory, as
-Administrator:
+> The installer is **not code-signed**, so SmartScreen will warn on first run:
+> *More info → Run anyway*.
+
+> There is no ARM64 installer — on Windows ARM64, use the zip below.
+
+#### Zip
+
+```powershell
+# x64
+Expand-Archive bvbrc-cli-2.0.16-windows-amd64.zip .
+# ARM64
+Expand-Archive bvbrc-cli-2.0.16-windows-arm64.zip .
+```
+
+The `.exe` files sit at the top of the extracted directory (there is no `bin\`
+on Windows). Either run the bundled installer from inside it, as Administrator:
+
 ```powershell
 powershell -ExecutionPolicy Bypass -File install.ps1
 ```
+
+or copy the executables to a directory of your own that is on `PATH`:
+
+```powershell
+$dest = "$env:LOCALAPPDATA\Programs\BVBRC"
+New-Item -ItemType Directory -Force $dest
+Copy-Item bvbrc-cli-2.0.16-windows-amd64\*.exe $dest
+# Add it to your user PATH (takes effect in new terminals)
+[Environment]::SetEnvironmentVariable(
+    "Path", [Environment]::GetEnvironmentVariable("Path", "User") + ";$dest", "User")
+```
+
+> Do **not** copy the tools into `C:\Windows\System32`. Earlier versions of this
+> README suggested it; it drops 138 executables into a system directory where
+> they are mixed in with Windows' own, cannot be upgraded or removed as a unit,
+> and may shadow system commands.
 
 ### Verification
 
 ```bash
 # Linux / macOS: verify checksums
-curl -LO https://github.com/BV-BRC/BV-BRC-Go-SDK/releases/download/v2.0.15/bvbrc-cli-2.0.15-checksums.sha256
-sha256sum -c bvbrc-cli-2.0.15-checksums.sha256
+curl -LO https://github.com/BV-BRC/BV-BRC-Go-SDK/releases/download/v2.0.16/bvbrc-cli-2.0.16-checksums.sha256
+sha256sum -c bvbrc-cli-2.0.16-checksums.sha256
 ```
 
 ```powershell
 # Windows: verify checksum of a single file
-Get-FileHash bvbrc-cli-2.0.15-windows-amd64.zip -Algorithm SHA256
+Get-FileHash bvbrc-cli-2.0.16-windows-amd64.zip -Algorithm SHA256
 ```
 
 Every command takes `--version`:
 
 ```bash
 $ p3-ls --version
-p3-ls 2.0.15
-bvbrc-cli-go/2.0.15 linux/amd64 go1.25.6
+p3-ls 2.0.16
+bvbrc-cli-go/2.0.16 linux/amd64 go1.25.6
 ```
 
 The second line is the exact `User-Agent` that binary sends, so it also reports
@@ -141,7 +206,7 @@ for its version; use `make` or a build script. To read the stamp without
 running the binary:
 
 ```bash
-go version -m $(which p3-ls) | grep ldflags   # -X .../version.Version=2.0.15
+go version -m $(which p3-ls) | grep ldflags   # -X .../version.Version=2.0.16
 ```
 
 ## Getting Started
@@ -340,9 +405,9 @@ go build -buildvcs=false ./...      # verify everything compiles
 make                                 # build to bin/
 
 # Release builds (static, stripped, version stamped into the binaries)
-VERSION=2.0.15 ./build-linux.sh      # Linux amd64 + arm64 + .deb
-VERSION=2.0.15 ./build-macos.sh      # macOS Intel + Apple Silicon + universal
-VERSION=2.0.15 ./build-windows.sh    # Windows x64 + ARM64
+VERSION=2.0.16 ./build-linux.sh      # Linux amd64 + arm64 + .deb
+VERSION=2.0.16 ./build-macos.sh      # macOS Intel + Apple Silicon + universal
+VERSION=2.0.16 ./build-windows.sh    # Windows x64 + ARM64
 
 # Single command
 go build -buildvcs=false -o bin/p3-all-genomes ./cmd/p3-all-genomes
@@ -382,11 +447,20 @@ Build scripts produce packages in `dist/`:
 | macOS Intel | `bvbrc-cli-VERSION-darwin-amd64.tar.gz` | `<dir>/bin/p3-*`, `<dir>/bin/rast-*` |
 | macOS Apple Silicon | `bvbrc-cli-VERSION-darwin-arm64.tar.gz` | `<dir>/bin/p3-*`, `<dir>/bin/rast-*` |
 | macOS universal | `bvbrc-cli-VERSION-darwin-universal.tar.gz` | `<dir>/bin/p3-*`, `<dir>/bin/rast-*` |
+| macOS Intel (installer) | `bvbrc-cli-VERSION-intel.pkg` | `/usr/local/bin` |
+| macOS Apple Silicon (installer) | `bvbrc-cli-VERSION-apple-silicon.pkg` | `/usr/local/bin` |
 | Windows x64 | `bvbrc-cli-VERSION-windows-amd64.zip` | `<dir>\p3-*.exe`, `<dir>\rast-*.exe` |
 | Windows ARM64 | `bvbrc-cli-VERSION-windows-arm64.zip` | `<dir>\p3-*.exe`, `<dir>\rast-*.exe` |
+| Windows x64 (installer) | `bvbrc-cli-VERSION-windows-amd64-setup.exe` | `C:\Program Files\BVBRC`, added to `PATH` |
 
-`<dir>` is `bvbrc-cli-VERSION-<platform>`; every archive expands into one, and
-each also carries a generated `README` and the `LICENSE`.
+`<dir>` is `bvbrc-cli-VERSION-<platform>`; every *archive* expands into one, and
+each also carries a generated `README` and the `LICENSE`. The three installers
+(`.pkg`, `-setup.exe`) place the tools directly and need no extraction; none of
+them is signed.
+
+The `.deb` and the installers are built by the same CI run as the archives:
+the `.pkg` pair on a macOS runner (`pkgbuild`/`productbuild` need macOS) and
+the NSIS `-setup.exe` on a Windows runner.
 
 The GitHub release additionally attaches `bvbrc-cli-VERSION-checksums.sha256`
 covering all of the above, and Apptainer/Singularity images
@@ -394,7 +468,7 @@ covering all of the above, and Apptainer/Singularity images
 with the tools preinstalled in `/usr/local/bin`:
 
 ```bash
-apptainer exec bvbrc-cli-2.0.15-ubuntu-24-amd64.sif p3-all-genomes --limit 1
+apptainer exec bvbrc-cli-2.0.16-ubuntu-24-amd64.sif p3-all-genomes --limit 1
 ```
 
 Published packages are built by CI from a `v*` tag pushed to this repository —
@@ -454,6 +528,26 @@ See `PORT_STATUS.md` for the per-command sync ledger and stale-check commands.
 ```bash
 go get github.com/BV-BRC/BV-BRC-Go-SDK
 ```
+
+> **You cannot pin to a release tag.** `go.mod` declares the module as
+> `github.com/BV-BRC/BV-BRC-Go-SDK` with no `/v2` suffix, while the released
+> tags are `v2.x`, so the module proxy rejects every one of them:
+>
+> ```
+> $ go get github.com/BV-BRC/BV-BRC-Go-SDK@v2.0.16
+> invalid version: module contains a go.mod file, so module path must
+> match major version ("github.com/BV-BRC/BV-BRC-Go-SDK/v2")
+> ```
+>
+> A plain `go get` (or `@latest`) therefore resolves to a **pseudo-version of
+> the current `main`**, e.g. `v0.0.0-20261014201752-0e6c61cf7852` — it works,
+> but it is not the released version and will not track one. For a reproducible
+> build, pin that pseudo-version explicitly in your own `go.mod`.
+>
+> For the same reason `go install github.com/BV-BRC/BV-BRC-Go-SDK/cmd/p3-ls@v2.0.16`
+> does not work. Install the CLI from a release archive, the conda package or an
+> installer instead. Fixing this means renaming the module to `…/v2`, which
+> rewrites every import path.
 
 ### Example: Query Genomes
 
