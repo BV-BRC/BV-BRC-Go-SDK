@@ -102,7 +102,7 @@ func run(cmd *cobra.Command, args []string) error {
 
 	// Handle --fields option
 	if dataOpts.Fields {
-		fields, err := client.GetSchema(ctx, "subsystem")
+		fields, err := client.GetSchema(ctx, "subsystemItem")
 		if err != nil {
 			return fmt.Errorf("getting schema: %w", err)
 		}

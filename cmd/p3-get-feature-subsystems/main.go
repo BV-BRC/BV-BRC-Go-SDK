@@ -99,7 +99,7 @@ func run(cmd *cobra.Command, args []string) error {
 
 	// Handle --fields option
 	if dataOpts.Fields {
-		fields, err := client.GetSchema(ctx, "subsystem")
+		fields, err := client.GetSchema(ctx, "subsystemItem")
 		if err != nil {
 			return fmt.Errorf("getting schema: %w", err)
 		}
@@ -205,7 +205,7 @@ func run(cmd *cobra.Command, args []string) error {
 
 			// Choose pagination method based on --cursor flag
 			var queryErr error
-			queryErr = client.QueryCallback(ctx, "subsystem", query, func(records []map[string]any, info *api.ChunkInfo) bool {
+			queryErr = client.QueryCallback(ctx, "subsystemItem", query, func(records []map[string]any, info *api.ChunkInfo) bool {
 				for _, record := range records {
 					var outRow []string
 					outRow = append(outRow, inputRow...)
